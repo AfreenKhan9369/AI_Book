@@ -303,14 +303,9 @@ export function Sidebar({
                 onClick={handleLinkClick}
                 className="flex items-center gap-2.5 group mb-2"
               >
-                <img
-                  src={
-                    user?.avatar ||
-                    "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80"
-                  }
-                  alt={user?.name}
-                  className="w-8 h-8 rounded-full object-cover ring-2 ring-indigo-500/20 group-hover:ring-indigo-500/50 transition-all flex-shrink-0"
-                />
+                <div className="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-200/80 text-indigo-700 flex items-center justify-center font-bold text-xs flex-shrink-0 group-hover:bg-indigo-100 transition-colors">
+                  <User className="w-4 h-4 text-indigo-600" />
+                </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-bold text-slate-900 truncate leading-tight group-hover:text-indigo-600 transition-colors">
                     {user?.name}

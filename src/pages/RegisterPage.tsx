@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { GraduationCap, UserPlus, AlertCircle, Loader2, Database, CheckCircle2 } from "lucide-react";
+import { GraduationCap, UserPlus, AlertCircle, Loader2, CheckCircle2 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
 export function RegisterPage() {
@@ -34,7 +34,7 @@ export function RegisterPage() {
         semester,
         roll_number: rollNumber.trim(),
       });
-      setSuccessMsg("Registration details saved to Supabase database!");
+      setSuccessMsg("Registration successful! Redirecting to your dashboard...");
       setTimeout(() => {
         navigate(role === "faculty" ? "/admin" : "/dashboard");
       }, 1000);
@@ -57,12 +57,6 @@ export function RegisterPage() {
         <p className="text-xs text-slate-500 mt-1">
           Join your college notes sharing network & access AI learning tools
         </p>
-
-        {/* Supabase Storage Status Pill */}
-        <div className="mt-3 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200/80 text-[11px] text-emerald-800 shadow-xs">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="font-medium">Database: <strong>Supabase Connected</strong> (<code className="font-mono text-[10px]">udsvohrfzzeanqnjfazb</code>)</span>
-        </div>
       </div>
 
       <div className="mt-5 sm:mx-auto sm:w-full sm:max-w-md">
@@ -139,9 +133,6 @@ export function RegisterPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full px-3.5 py-2 text-xs bg-slate-50 focus:bg-white border border-slate-300 focus:border-indigo-600 rounded-xl focus:outline-none"
               />
-              <p className="text-[10px] text-slate-400 mt-1">
-                Stored in Supabase Auth & Registration Directory
-              </p>
             </div>
 
             <div>
@@ -206,20 +197,13 @@ export function RegisterPage() {
               />
             </div>
 
-            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 text-[11px] text-slate-600 flex items-start gap-2">
-              <Database className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
-              <span>
-                Your registration details will be recorded in <strong>Supabase</strong> with encrypted authentication and profile metadata.
-              </span>
-            </div>
-
             <button
               type="submit"
               disabled={loading}
               className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 disabled:opacity-50 mt-2"
             >
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
-              <span>{loading ? "Registering & Syncing to Supabase..." : `Register as ${role === "faculty" ? "Faculty" : "Student"}`}</span>
+              <span>{loading ? "Creating account..." : `Register as ${role === "faculty" ? "Faculty" : "Student"}`}</span>
             </button>
           </form>
 

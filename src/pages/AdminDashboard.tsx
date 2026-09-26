@@ -613,7 +613,7 @@ CREATE POLICY "Allow public anon updates" ON public.registrations FOR UPDATE USI
             }`}
           >
             <Database className="w-4 h-4 text-emerald-600" />
-            <span>Supabase Cloud DB</span>
+            <span>Cloud Database</span>
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
           </button>
         </div>

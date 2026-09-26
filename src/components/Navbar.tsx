@@ -108,16 +108,6 @@ export function Navbar({
               </div>
             )}
 
-            {/* Supabase Status Indicator */}
-            <div
-              className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-emerald-50/90 border border-emerald-200 text-emerald-800 text-[11px] font-medium"
-              title="Supabase Cloud Database Connected: udsvohrfzzeanqnjfazb"
-            >
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="font-semibold text-emerald-900">Supabase</span>
-              <span className="text-[10px] text-emerald-600 font-mono hidden xl:inline">udsvohrf...</span>
-            </div>
-
             {/* Faculty Only Upload button */}
             {isFaculty && onOpenUpload && (
               <button
@@ -140,14 +130,9 @@ export function Navbar({
                   onClick={() => setUserDropdownOpen(!userDropdownOpen)}
                   className="flex items-center gap-2 p-1 sm:px-2.5 sm:py-1.5 rounded-xl border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 transition-all text-left"
                 >
-                  <img
-                    src={
-                      user?.avatar ||
-                      "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80"
-                    }
-                    alt={user?.name}
-                    className="w-7 h-7 rounded-full object-cover ring-2 ring-indigo-500/20"
-                  />
+                  <div className="w-7 h-7 rounded-lg bg-indigo-50 border border-indigo-200/80 text-indigo-700 flex items-center justify-center font-bold text-xs flex-shrink-0">
+                    <User className="w-4 h-4 text-indigo-600" />
+                  </div>
                   <div className="hidden md:flex flex-col">
                     <span className="text-xs font-bold text-slate-800 leading-tight truncate max-w-[110px]">
                       {user?.name}

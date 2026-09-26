@@ -94,11 +94,9 @@ export function ProfilePage({ onViewPdf, onDownloadPdf, onOpenAi }: ProfilePageP
     <div className="space-y-6 pb-12">
       {/* Profile Card Header */}
       <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-xs flex flex-col sm:flex-row items-center sm:items-start gap-6">
-        <img
-          src={user?.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80"}
-          alt={user?.name}
-          className="w-24 h-24 rounded-2xl object-cover ring-4 ring-indigo-50 shadow-md"
-        />
+        <div className="w-20 h-20 rounded-2xl bg-indigo-50 border border-indigo-200 text-indigo-600 flex items-center justify-center shadow-xs flex-shrink-0">
+          <UserIcon className="w-10 h-10 text-indigo-600" />
+        </div>
 
         <div className="space-y-2 text-center sm:text-left flex-1">
           <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">

@@ -206,7 +206,7 @@ export async function initDatabaseAndSeed(): Promise<void> {
         "Computer Science",
         4,
         "FAC-CS-101",
-        "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+        "",
       ]
     );
     facultyId = facultyRes.insertId || 1;
@@ -222,7 +222,7 @@ export async function initDatabaseAndSeed(): Promise<void> {
         "Computer Science",
         4,
         "CS-2024-042",
-        "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150&auto=format&fit=crop&q=80",
+        "",
       ]
     );
     studentId = studentRes.insertId || 2;
