@@ -25,20 +25,37 @@ export async function register(req: Request, res: Response): Promise<void> {
     }
 
     const db = await getDatabase();
-    const existing = await db.getOne("SELECT id FROM users WHERE email = ?;", [email.toLowerCase().trim()]);
+    const cleanEmail = email.toLowerCase().trim();
+    const supabase = getSupabase();
+
+    // Check if user exists in local database or Supabase registrations table
+    const existing = await db.getOne("SELECT id FROM users WHERE email = ?;", [cleanEmail]);
     if (existing) {
       res.status(409).json({ message: "An account with this email already exists." });
       return;
     }
 
+    try {
+      const { data: existingSupa } = await supabase
+        .from("registrations")
+        .select("id")
+        .eq("email", cleanEmail)
+        .maybeSingle();
+
+      if (existingSupa) {
+        res.status(409).json({ message: "An account with this email is already registered in Supabase." });
+        return;
+      }
+    } catch {}
+
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
     const assignedRole = role === "faculty" || role === "admin" ? "faculty" : "student";
 
-    // 1. Store registration details in Supabase database & Auth
+    // 1. Store registration details in Supabase PostgreSQL & Auth
     const supabaseSync = await storeRegistrationInSupabase({
       name: name.trim(),
-      email: email.toLowerCase().trim(),
+      email: cleanEmail,
       password,
       role: assignedRole,
       branch,
@@ -46,13 +63,13 @@ export async function register(req: Request, res: Response): Promise<void> {
       roll_number: roll_number.trim(),
     });
 
-    // 2. Store in local relational database with Supabase sync tracking
+    // 2. Store in database with Supabase sync tracking
     const insertResult = await db.execute(
       `INSERT INTO users (name, email, password, role, branch, semester, roll_number, supabase_user_id, supabase_synced, supabase_synced_at) 
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
       [
         name.trim(),
-        email.toLowerCase().trim(),
+        cleanEmail,
         hashedPassword,
         assignedRole,
         branch,
@@ -68,7 +85,7 @@ export async function register(req: Request, res: Response): Promise<void> {
     const userPayload = {
       id: newUserId,
       name: name.trim(),
-      email: email.toLowerCase().trim(),
+      email: cleanEmail,
       role: assignedRole as "student" | "faculty",
       branch,
       semester: parseInt(semester, 10) || 1,
@@ -80,14 +97,14 @@ export async function register(req: Request, res: Response): Promise<void> {
     const token = generateToken(userPayload);
 
     res.status(201).json({
-      message: "Registration successful! Account stored in Supabase database.",
+      message: "Registration successful! Account stored in Supabase PostgreSQL database.",
       token,
       user: userPayload,
       supabase: supabaseSync,
     });
   } catch (error: any) {
     console.error("[Auth] Register error:", error);
-    res.status(500).json({ message: "Internal server error during registration." });
+    res.status(500).json({ message: error?.message || "Internal server error during registration." });
   }
 }
 

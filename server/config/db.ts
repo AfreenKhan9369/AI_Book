@@ -1,11 +1,12 @@
 import path from "node:path";
 import fs from "node:fs";
+import { getSupabase } from "./supabase.js";
 
 export interface DatabaseAdapter {
   query<T = any>(sql: string, params?: any[]): Promise<T[]>;
-  execute(sql: string, params?: any[]): Promise<{ insertId?: number; changes?: number }>;
+  execute(sql: string, params?: any[]): Promise<{ insertId?: number | string; changes?: number }>;
   getOne<T = any>(sql: string, params?: any[]): Promise<T | null>;
-  type: "mysql" | "sqlite" | "memory";
+  type: "supabase" | "mysql";
 }
 
 let dbInstance: DatabaseAdapter | null = null;
@@ -19,18 +20,10 @@ function normalizeParams(params: any[] = []): any[] {
   });
 }
 
-function sanitizeSqlForSqlite(sql: string): string {
-  return sql
-    .replace(/AUTO_INCREMENT/gi, "AUTOINCREMENT")
-    .replace(/INT AUTO_INCREMENT/gi, "INTEGER AUTOINCREMENT")
-    .replace(/NOW\(\)/gi, "CURRENT_TIMESTAMP")
-    .replace(/DATETIME DEFAULT CURRENT_TIMESTAMP/gi, "TEXT DEFAULT CURRENT_TIMESTAMP");
-}
-
 export async function getDatabase(): Promise<DatabaseAdapter> {
   if (dbInstance) return dbInstance;
 
-  // 1. MySQL (if MYSQL_HOST configured)
+  // 1. MySQL (optional, if MYSQL_HOST configured)
   const mysqlHost = process.env.MYSQL_HOST;
   if (mysqlHost) {
     try {
@@ -67,80 +60,25 @@ export async function getDatabase(): Promise<DatabaseAdapter> {
       };
       return dbInstance;
     } catch (err) {
-      console.warn("[DB] MySQL connection failed. Falling back to embedded engine:", err);
+      console.warn("[DB] MySQL connection failed. Proceeding with Supabase PostgreSQL:", err);
     }
   }
 
-  // 2. Node.js built-in node:sqlite via dynamic function (invisible to esbuild/Netlify bundlers)
-  let sqliteDb: any = null;
+  // 2. Supabase PostgreSQL primary engine (Zero SQLite dependencies)
+  console.log("[DB] Initializing AI_Book Supabase PostgreSQL Database Engine...");
+
+  let cacheDir = path.join(process.cwd(), "data");
   try {
-    const dynamicImport = new Function("specifier", "return import(specifier)");
-    const sqliteMod = await dynamicImport("node:sqlite");
-    if (sqliteMod && sqliteMod.DatabaseSync) {
-      let dbDir = path.join(process.cwd(), "data");
-      try {
-        if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true });
-      } catch {
-        dbDir = path.join("/tmp", "data");
-        if (!fs.existsSync(dbDir)) {
-          try { fs.mkdirSync(dbDir, { recursive: true }); } catch {}
-        }
-      }
-      const dbPath = path.join(dbDir, "aibook.db");
-      sqliteDb = new sqliteMod.DatabaseSync(dbPath);
-      try {
-        sqliteDb.exec("PRAGMA journal_mode = WAL;");
-        sqliteDb.exec("PRAGMA foreign_keys = ON;");
-      } catch {}
-      console.log(`[DB] SQLite database initialized at ${dbPath}`);
-    }
-  } catch (_e) {
-    sqliteDb = null;
-  }
-
-  if (sqliteDb) {
-    dbInstance = {
-      type: "sqlite",
-      async query<T = any>(sql: string, params: any[] = []): Promise<T[]> {
-        const sanitizedSql = sanitizeSqlForSqlite(sql);
-        const cleanParams = normalizeParams(params);
-        const stmt = sqliteDb.prepare(sanitizedSql);
-        return stmt.all(...cleanParams) as unknown as T[];
-      },
-      async execute(sql: string, params: any[] = []): Promise<{ insertId?: number; changes?: number }> {
-        const sanitizedSql = sanitizeSqlForSqlite(sql);
-        const cleanParams = normalizeParams(params);
-        const stmt = sqliteDb.prepare(sanitizedSql);
-        const result = stmt.run(...cleanParams);
-        return {
-          insertId: Number(result.lastInsertRowid),
-          changes: Number(result.changes),
-        };
-      },
-      async getOne<T = any>(sql: string, params: any[] = []): Promise<T | null> {
-        const sanitizedSql = sanitizeSqlForSqlite(sql);
-        const cleanParams = normalizeParams(params);
-        const stmt = sqliteDb.prepare(sanitizedSql);
-        const row = stmt.get(...cleanParams);
-        return (row as T) || null;
-      },
-    };
-    return dbInstance;
-  }
-
-  // 3. Robust In-Memory JSON-backed Relational Store (Fallback for serverless environments)
-  console.log("[DB] Using Zero-Dependency Serverless Relational Store");
-
-  let storeDir = path.join(process.cwd(), "data");
-  try {
-    if (!fs.existsSync(storeDir)) fs.mkdirSync(storeDir, { recursive: true });
+    if (!fs.existsSync(cacheDir)) fs.mkdirSync(cacheDir, { recursive: true });
   } catch {
-    storeDir = path.join("/tmp", "data");
-    if (!fs.existsSync(storeDir)) {
-      try { fs.mkdirSync(storeDir, { recursive: true }); } catch {}
+    cacheDir = path.join("/tmp", "data");
+    if (!fs.existsSync(cacheDir)) {
+      try {
+        fs.mkdirSync(cacheDir, { recursive: true });
+      } catch {}
     }
   }
-  const storePath = path.join(storeDir, "serverless_db.json");
+  const cachePath = path.join(cacheDir, "supabase_cache.json");
 
   const tables: Record<string, any[]> = {
     users: [],
@@ -150,12 +88,12 @@ export async function getDatabase(): Promise<DatabaseAdapter> {
     quiz_history: [],
   };
 
-  const loadData = () => {
+  const loadLocalCache = () => {
     try {
-      if (fs.existsSync(storePath)) {
-        const parsed = JSON.parse(fs.readFileSync(storePath, "utf-8"));
+      if (fs.existsSync(cachePath)) {
+        const parsed = JSON.parse(fs.readFileSync(cachePath, "utf-8"));
         for (const [key, val] of Object.entries(parsed)) {
-          if (Array.isArray(val)) {
+          if (Array.isArray(val) && val.length > 0) {
             tables[key] = val;
           }
         }
@@ -163,21 +101,79 @@ export async function getDatabase(): Promise<DatabaseAdapter> {
     } catch {}
   };
 
-  const saveData = () => {
+  const saveLocalCache = () => {
     try {
-      fs.writeFileSync(storePath, JSON.stringify(tables, null, 2));
+      fs.writeFileSync(cachePath, JSON.stringify(tables, null, 2));
     } catch {}
   };
 
-  loadData();
+  loadLocalCache();
+
+  // Hydrate tables directly from Supabase PostgreSQL
+  const supabase = getSupabase();
+  try {
+    const [subRes, matRes, regRes, bmRes, qhRes] = await Promise.allSettled([
+      supabase.from("subjects").select("*"),
+      supabase.from("materials").select("*"),
+      supabase.from("registrations").select("*"),
+      supabase.from("bookmarks").select("*"),
+      supabase.from("quiz_history").select("*"),
+    ]);
+
+    if (subRes.status === "fulfilled" && subRes.value.data && subRes.value.data.length > 0) {
+      tables.subjects = subRes.value.data;
+    }
+    if (matRes.status === "fulfilled" && matRes.value.data && matRes.value.data.length > 0) {
+      tables.materials = matRes.value.data;
+    }
+    if (bmRes.status === "fulfilled" && bmRes.value.data && bmRes.value.data.length > 0) {
+      tables.bookmarks = bmRes.value.data;
+    }
+    if (qhRes.status === "fulfilled" && qhRes.value.data && qhRes.value.data.length > 0) {
+      tables.quiz_history = qhRes.value.data;
+    }
+
+    if (regRes.status === "fulfilled" && regRes.value.data && regRes.value.data.length > 0) {
+      const existingUserMap = new Map(tables.users.map((u) => [u.email, u]));
+      let nextId = tables.users.reduce((max, u) => Math.max(max, Number(u.id) || 0), 0) + 1;
+
+      for (const reg of regRes.value.data) {
+        if (!existingUserMap.has(reg.email)) {
+          tables.users.push({
+            id: nextId++,
+            name: reg.name,
+            email: reg.email,
+            password: "",
+            role: reg.role,
+            branch: reg.branch,
+            semester: reg.semester,
+            roll_number: reg.roll_number,
+            avatar: reg.avatar_url || "",
+            supabase_user_id: reg.auth_user_id || reg.id,
+            supabase_synced: 1,
+            supabase_synced_at: reg.updated_at || reg.created_at,
+            created_at: reg.created_at,
+          });
+        }
+      }
+    }
+
+    saveLocalCache();
+    console.log(
+      `[DB] Supabase PostgreSQL sync complete: ${tables.subjects.length} subjects, ${tables.materials.length} materials, ${tables.users.length} users`
+    );
+  } catch (err: any) {
+    console.warn("[DB] Non-blocking notice during Supabase PostgreSQL sync:", err.message);
+  }
 
   dbInstance = {
-    type: "memory",
+    type: "supabase",
+
     async query<T = any>(sql: string, params: any[] = []): Promise<T[]> {
       const cleanParams = normalizeParams(params);
       const cleanSql = sql.trim();
 
-      // COUNT(*) query handlers
+      // 1. COUNT(*) queries
       if (/SELECT\s+COUNT\(\*\)\s+as\s+count\s+FROM\s+([a-zA-Z0-9_]+)/i.test(cleanSql)) {
         const match = cleanSql.match(/FROM\s+([a-zA-Z0-9_]+)(?:\s+WHERE\s+(.+))?/i);
         if (match) {
@@ -199,266 +195,504 @@ export async function getDatabase(): Promise<DatabaseAdapter> {
         }
       }
 
-      // SUM(downloads_count)
+      // 2. SUM(downloads_count)
       if (/SUM\(downloads_count\)/i.test(cleanSql)) {
         const total = (tables.materials || []).reduce((acc, m) => acc + (Number(m.downloads_count) || 0), 0);
         return [{ total_downloads: total }] as unknown as T[];
       }
 
-      // SELECT FROM subjects
-      if (/FROM\s+subjects/i.test(cleanSql)) {
-        let rows = [...(tables.subjects || [])];
-        if (/WHERE\s+semester\s*=\s*\?/i.test(cleanSql) && cleanParams[0] != null) {
-          rows = rows.filter((s) => s.semester === cleanParams[0]);
-        }
-        return rows as unknown as T[];
+      // 3. User stats (total & synced)
+      if (/COUNT\(\*\)\s+as\s+total.*SUM\(CASE\s+WHEN\s+supabase_synced/i.test(cleanSql)) {
+        const total = (tables.users || []).length;
+        const synced = (tables.users || []).filter((u) => u.supabase_synced === 1).length;
+        return [{ total, synced }] as unknown as T[];
       }
 
-      // SELECT FROM materials
+      // 4. Subjects list with notes_count and pyqs_count
+      if (/FROM\s+subjects\s+s/i.test(cleanSql) || /FROM\s+subjects/i.test(cleanSql)) {
+        let subs = [...(tables.subjects || [])];
+
+        if (/s\.semester\s*=\s*\?/i.test(cleanSql) || /semester\s*=\s*\?/i.test(cleanSql)) {
+          const semVal = cleanParams.find((p) => typeof p === "number");
+          if (semVal !== undefined) {
+            subs = subs.filter((s) => s.semester === semVal);
+          }
+        }
+        if (/s\.branch\s*=\s*\?/i.test(cleanSql) || /branch\s*=\s*\?/i.test(cleanSql)) {
+          const branchVal = cleanParams.find((p) => typeof p === "string" && p !== "All");
+          if (branchVal !== undefined) {
+            subs = subs.filter((s) => s.branch === branchVal);
+          }
+        }
+
+        subs.sort((a, b) => (a.semester || 0) - (b.semester || 0) || (a.name || "").localeCompare(b.name || ""));
+
+        const mapped = subs.map((s) => {
+          const notes = (tables.materials || []).filter((m) => m.subject_id === s.id && m.type === "note").length;
+          const pyqs = (tables.materials || []).filter((m) => m.subject_id === s.id && m.type === "pyq").length;
+          return {
+            ...s,
+            notes_count: notes,
+            pyqs_count: pyqs,
+          };
+        });
+        return mapped as unknown as T[];
+      }
+
+      // 5. Materials list query
       if (/FROM\s+materials/i.test(cleanSql)) {
-        let rows = [...(tables.materials || [])];
-        if (/ORDER\s+BY\s+downloads_count\s+DESC/i.test(cleanSql)) {
-          rows.sort((a, b) => (b.downloads_count || 0) - (a.downloads_count || 0));
+        let mats = [...(tables.materials || [])];
+        const subMap = new Map((tables.subjects || []).map((s) => [s.id, s]));
+
+        if (/m\.type\s*=\s*\?/i.test(cleanSql)) {
+          const typeVal = cleanParams[0];
+          if (typeVal && typeVal !== "all") {
+            mats = mats.filter((m) => m.type === typeVal);
+          }
+        }
+        if (/m\.semester\s*=\s*\?/i.test(cleanSql)) {
+          const semVal = cleanParams.find((p, idx) => /semester\s*=\s*\?/i.test(cleanSql.slice(0, cleanSql.indexOf("?") * (idx + 1))));
+          if (semVal) mats = mats.filter((m) => m.semester === semVal);
+        }
+        if (/m\.subject_id\s*=\s*\?/i.test(cleanSql)) {
+          const subId = cleanParams.find((p) => typeof p === "number");
+          if (subId) mats = mats.filter((m) => m.subject_id === subId);
+        }
+        if (/m\.branch\s*=\s*\?/i.test(cleanSql)) {
+          const bVal = cleanParams.find((p) => typeof p === "string" && p !== "all" && p !== "All");
+          if (bVal) mats = mats.filter((m) => m.branch === bVal);
+        }
+
+        // Sort
+        if (/downloads_count\s+DESC/i.test(cleanSql)) {
+          mats.sort((a, b) => (b.downloads_count || 0) - (a.downloads_count || 0));
+        } else if (/views_count\s+DESC/i.test(cleanSql)) {
+          mats.sort((a, b) => (b.views_count || 0) - (a.views_count || 0));
         } else {
-          rows.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+          mats.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
         }
-        if (/LIMIT\s+([0-9]+)/i.test(cleanSql)) {
-          const limit = parseInt(cleanSql.match(/LIMIT\s+([0-9]+)/i)![1], 10);
-          rows = rows.slice(0, limit);
+
+        // Limit
+        const limitMatch = cleanSql.match(/LIMIT\s+([0-9]+)/i);
+        if (limitMatch) {
+          mats = mats.slice(0, parseInt(limitMatch[1], 10));
         }
-        return rows as unknown as T[];
+
+        const enriched = mats.map((m) => {
+          const sub = subMap.get(m.subject_id);
+          return {
+            ...m,
+            subject_name: sub?.name || "",
+            subject_code: sub?.code || "",
+            is_bookmarked: (tables.bookmarks || []).some((b) => b.material_id === m.id) ? 1 : 0,
+          };
+        });
+        return enriched as unknown as T[];
       }
 
-      // SELECT FROM users
+      // 6. Users list query
       if (/FROM\s+users/i.test(cleanSql)) {
-        let rows = [...(tables.users || [])];
-        if (/WHERE\s+role\s*=\s*'student'/i.test(cleanSql)) {
-          rows = rows.filter((u) => u.role === "student");
+        let users = [...(tables.users || [])];
+        if (/WHERE\s+u?\.?role\s*=\s*'student'/i.test(cleanSql)) {
+          users = users.filter((u) => u.role === "student");
         }
-        return rows as unknown as T[];
+        if (/ORDER\s+BY\s+id\s+DESC/i.test(cleanSql)) {
+          users.sort((a, b) => (b.id || 0) - (a.id || 0));
+        }
+        return users as unknown as T[];
       }
 
-      // SELECT FROM bookmarks
-      if (/FROM\s+bookmarks/i.test(cleanSql)) {
-        let rows = [...(tables.bookmarks || [])];
-        if (/WHERE\s+user_id\s*=\s*\?/i.test(cleanSql) && cleanParams[0] != null) {
-          rows = rows.filter((b) => b.user_id === cleanParams[0]);
-        }
-        return rows as unknown as T[];
-      }
-
-      // SELECT FROM quiz_history
+      // 7. Quiz history
       if (/FROM\s+quiz_history/i.test(cleanSql)) {
-        let rows = [...(tables.quiz_history || [])];
+        let history = [...(tables.quiz_history || [])];
         if (/WHERE\s+user_id\s*=\s*\?/i.test(cleanSql) && cleanParams[0] != null) {
-          rows = rows.filter((q) => q.user_id === cleanParams[0]);
+          history = history.filter((q) => q.user_id === cleanParams[0] || String(q.user_id) === String(cleanParams[0]));
         }
-        return rows as unknown as T[];
+        history.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+        return history.slice(0, 10) as unknown as T[];
+      }
+
+      // 8. Bookmarks
+      if (/FROM\s+bookmarks/i.test(cleanSql)) {
+        let bms = [...(tables.bookmarks || [])];
+        if (/WHERE\s+user_id\s*=\s*\?/i.test(cleanSql) && cleanParams[0] != null) {
+          bms = bms.filter((b) => b.user_id === cleanParams[0] || String(b.user_id) === String(cleanParams[0]));
+        }
+        return bms as unknown as T[];
       }
 
       return [] as T[];
-    },
-
-    async execute(sql: string, params: any[] = []): Promise<{ insertId?: number; changes?: number }> {
-      const cleanParams = normalizeParams(params);
-      const cleanSql = sql.trim();
-
-      // CREATE TABLE
-      const createMatch = cleanSql.match(/CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+([a-zA-Z0-9_]+)/i);
-      if (createMatch) {
-        const table = createMatch[1];
-        if (!tables[table]) tables[table] = [];
-        return { changes: 1 };
-      }
-
-      // ALTER TABLE
-      if (/ALTER\s+TABLE/i.test(cleanSql)) {
-        return { changes: 1 };
-      }
-
-      // INSERT INTO users
-      if (/INSERT\s+INTO\s+users/i.test(cleanSql)) {
-        const id = (tables.users.reduce((max, u) => Math.max(max, u.id || 0), 0) || 0) + 1;
-        const now = new Date().toISOString();
-        const userObj: any = {
-          id,
-          name: cleanParams[0] || "",
-          email: cleanParams[1] || "",
-          password: cleanParams[2] || "",
-          role: cleanParams[3] || "student",
-          branch: cleanParams[4] || "Computer Science",
-          semester: cleanParams[5] || 4,
-          roll_number: cleanParams[6] || "",
-          avatar: cleanParams[7] || "",
-          supabase_user_id: cleanParams[8] || "",
-          supabase_synced: cleanParams[9] || 0,
-          supabase_synced_at: cleanParams[10] || now,
-          created_at: now,
-        };
-        tables.users.push(userObj);
-        saveData();
-        return { insertId: id, changes: 1 };
-      }
-
-      // INSERT INTO subjects
-      if (/INSERT\s+INTO\s+subjects/i.test(cleanSql)) {
-        const id = (tables.subjects.reduce((max, s) => Math.max(max, s.id || 0), 0) || 0) + 1;
-        tables.subjects.push({
-          id,
-          code: cleanParams[0] || "",
-          name: cleanParams[1] || "",
-          semester: cleanParams[2] || 1,
-          branch: cleanParams[3] || "Engineering",
-          description: cleanParams[4] || "",
-          created_at: new Date().toISOString(),
-        });
-        saveData();
-        return { insertId: id, changes: 1 };
-      }
-
-      // INSERT INTO materials
-      if (/INSERT\s+INTO\s+materials/i.test(cleanSql)) {
-        const id = (tables.materials.reduce((max, m) => Math.max(max, m.id || 0), 0) || 0) + 1;
-        tables.materials.push({
-          id,
-          title: cleanParams[0] || "",
-          type: cleanParams[1] || "note",
-          subject_id: cleanParams[2] || 1,
-          semester: cleanParams[3] || 1,
-          branch: cleanParams[4] || "Engineering",
-          academic_year: cleanParams[5] || "2024-25",
-          module_unit: cleanParams[6] || "Unit 1",
-          file_name: cleanParams[7] || "",
-          file_path: cleanParams[8] || "",
-          file_size: cleanParams[9] || "1.0 MB",
-          file_type: cleanParams[10] || "application/pdf",
-          description: cleanParams[11] || "",
-          uploader_id: cleanParams[12] || 1,
-          uploader_name: cleanParams[13] || "Faculty",
-          downloads_count: 0,
-          views_count: 0,
-          created_at: new Date().toISOString(),
-        });
-        saveData();
-        return { insertId: id, changes: 1 };
-      }
-
-      // INSERT INTO bookmarks
-      if (/INSERT\s+INTO\s+bookmarks/i.test(cleanSql)) {
-        const id = (tables.bookmarks.reduce((max, b) => Math.max(max, b.id || 0), 0) || 0) + 1;
-        tables.bookmarks.push({
-          id,
-          user_id: cleanParams[0],
-          material_id: cleanParams[1],
-          created_at: new Date().toISOString(),
-        });
-        saveData();
-        return { insertId: id, changes: 1 };
-      }
-
-      // INSERT INTO quiz_history
-      if (/INSERT\s+INTO\s+quiz_history/i.test(cleanSql)) {
-        const id = (tables.quiz_history.reduce((max, q) => Math.max(max, q.id || 0), 0) || 0) + 1;
-        tables.quiz_history.push({
-          id,
-          user_id: cleanParams[0],
-          subject_name: cleanParams[1],
-          topic: cleanParams[2],
-          score: cleanParams[3],
-          total_questions: cleanParams[4],
-          created_at: new Date().toISOString(),
-        });
-        saveData();
-        return { insertId: id, changes: 1 };
-      }
-
-      // UPDATE materials (views or downloads)
-      if (/UPDATE\s+materials\s+SET\s+views_count\s*=\s*views_count\s*\+\s*1\s+WHERE\s+id\s*=\s*\?/i.test(cleanSql)) {
-        const id = cleanParams[0];
-        const item = tables.materials.find((m) => m.id === id);
-        if (item) item.views_count = (item.views_count || 0) + 1;
-        saveData();
-        return { changes: 1 };
-      }
-      if (/UPDATE\s+materials\s+SET\s+downloads_count\s*=\s*downloads_count\s*\+\s*1\s+WHERE\s+id\s*=\s*\?/i.test(cleanSql)) {
-        const id = cleanParams[0];
-        const item = tables.materials.find((m) => m.id === id);
-        if (item) item.downloads_count = (item.downloads_count || 0) + 1;
-        saveData();
-        return { changes: 1 };
-      }
-
-      // DELETE FROM bookmarks
-      if (/DELETE\s+FROM\s+bookmarks\s+WHERE/i.test(cleanSql)) {
-        if (/WHERE\s+id\s*=\s*\?/i.test(cleanSql)) {
-          tables.bookmarks = tables.bookmarks.filter((b) => b.id !== cleanParams[0]);
-        } else if (/WHERE\s+material_id\s*=\s*\?/i.test(cleanSql)) {
-          tables.bookmarks = tables.bookmarks.filter((b) => b.material_id !== cleanParams[0]);
-        }
-        saveData();
-        return { changes: 1 };
-      }
-
-      // DELETE FROM materials
-      if (/DELETE\s+FROM\s+materials\s+WHERE\s+id\s*=\s*\?/i.test(cleanSql)) {
-        tables.materials = tables.materials.filter((m) => m.id !== cleanParams[0]);
-        saveData();
-        return { changes: 1 };
-      }
-
-      saveData();
-      return { changes: 1 };
     },
 
     async getOne<T = any>(sql: string, params: any[] = []): Promise<T | null> {
       const cleanParams = normalizeParams(params);
       const cleanSql = sql.trim();
 
-      // SELECT FROM users WHERE email = ?
-      if (/FROM\s+users\s+WHERE\s+email\s*=\s*\?/i.test(cleanSql)) {
+      // Find user by email
+      if (/FROM\s+users\s+WHERE\s+email\s*=\s*\?/i.test(cleanSql) && cleanParams[0]) {
         const email = String(cleanParams[0]).toLowerCase().trim();
-        const user = tables.users.find((u) => u.email.toLowerCase().trim() === email);
-        return (user as T) || null;
+        const found = (tables.users || []).find((u) => u.email?.toLowerCase().trim() === email);
+        if (found) return found as T;
+
+        // Try direct Supabase query
+        try {
+          const { data } = await supabase.from("registrations").select("*").eq("email", email).maybeSingle();
+          if (data) {
+            const nextId = (tables.users || []).length + 1;
+            const mappedUser = {
+              id: nextId,
+              name: data.name,
+              email: data.email,
+              password: "",
+              role: data.role,
+              branch: data.branch,
+              semester: data.semester,
+              roll_number: data.roll_number,
+              avatar: data.avatar_url || "",
+              supabase_user_id: data.auth_user_id || data.id,
+              supabase_synced: 1,
+              supabase_synced_at: data.updated_at || data.created_at,
+              created_at: data.created_at,
+            };
+            tables.users.push(mappedUser);
+            saveLocalCache();
+            return mappedUser as unknown as T;
+          }
+        } catch {}
+        return null;
       }
 
-      // SELECT FROM users WHERE id = ?
-      if (/FROM\s+users\s+WHERE\s+id\s*=\s*\?/i.test(cleanSql)) {
-        const id = Number(cleanParams[0]);
-        const user = tables.users.find((u) => u.id === id);
-        return (user as T) || null;
+      // Find user by ID
+      if (/FROM\s+users\s+WHERE\s+id\s*=\s*\?/i.test(cleanSql) && cleanParams[0] != null) {
+        const idVal = cleanParams[0];
+        const found = (tables.users || []).find((u) => u.id === idVal || String(u.id) === String(idVal));
+        return (found as T) || null;
       }
 
-      // SELECT FROM subjects WHERE code = ?
-      if (/FROM\s+subjects\s+WHERE\s+code\s*=\s*\?/i.test(cleanSql)) {
+      // Find subject by code
+      if (/FROM\s+subjects\s+WHERE\s+code\s*=\s*\?/i.test(cleanSql) && cleanParams[0]) {
         const code = String(cleanParams[0]).toUpperCase().trim();
-        const subject = tables.subjects.find((s) => s.code.toUpperCase().trim() === code);
-        return (subject as T) || null;
+        const found = (tables.subjects || []).find((s) => s.code?.toUpperCase().trim() === code);
+        return (found as T) || null;
       }
 
-      // SELECT FROM subjects WHERE id = ?
-      if (/FROM\s+subjects\s+WHERE\s+id\s*=\s*\?/i.test(cleanSql)) {
-        const id = Number(cleanParams[0]);
-        const subject = tables.subjects.find((s) => s.id === id);
-        return (subject as T) || null;
+      // Find subject by ID
+      if (/FROM\s+subjects\s+WHERE\s+id\s*=\s*\?/i.test(cleanSql) && cleanParams[0] != null) {
+        const idVal = cleanParams[0];
+        const found = (tables.subjects || []).find((s) => s.id === idVal || Number(s.id) === Number(idVal));
+        return (found as T) || null;
       }
 
-      // SELECT FROM materials WHERE id = ?
-      if (/FROM\s+materials\s+WHERE\s+id\s*=\s*\?/i.test(cleanSql)) {
-        const id = Number(cleanParams[0]);
-        const material = tables.materials.find((m) => m.id === id);
-        return (material as T) || null;
+      // Find material by ID
+      if (/FROM\s+materials/i.test(cleanSql) && /WHERE\s+(?:m\.)?id\s*=\s*\?/i.test(cleanSql) && cleanParams[0] != null) {
+        const idVal = cleanParams[0];
+        const found = (tables.materials || []).find((m) => m.id === idVal || Number(m.id) === Number(idVal));
+        if (found) {
+          const sub = (tables.subjects || []).find((s) => s.id === found.subject_id);
+          return {
+            ...found,
+            subject_name: sub?.name || "",
+            subject_code: sub?.code || "",
+            is_bookmarked: (tables.bookmarks || []).some((b) => b.material_id === found.id) ? 1 : 0,
+          } as unknown as T;
+        }
+        return null;
       }
 
-      // SELECT FROM bookmarks WHERE user_id = ? AND material_id = ?
+      // Find bookmark
       if (/FROM\s+bookmarks\s+WHERE\s+user_id\s*=\s*\?\s+AND\s+material_id\s*=\s*\?/i.test(cleanSql)) {
-        const uid = cleanParams[0];
-        const mid = cleanParams[1];
-        const bm = tables.bookmarks.find((b) => b.user_id === uid && b.material_id === mid);
-        return (bm as T) || null;
+        const userId = cleanParams[0];
+        const matId = cleanParams[1];
+        const found = (tables.bookmarks || []).find(
+          (b) => (b.user_id === userId || String(b.user_id) === String(userId)) && (b.material_id === matId || Number(b.material_id) === Number(matId))
+        );
+        return (found as T) || null;
       }
 
       const rows = await this.query<T>(sql, params);
       return rows && rows.length > 0 ? rows[0] : null;
+    },
+
+    async execute(sql: string, params: any[] = []): Promise<{ insertId?: number | string; changes?: number }> {
+      const cleanParams = normalizeParams(params);
+      const cleanSql = sql.trim();
+
+      // INSERT INTO users
+      if (/INSERT\s+INTO\s+users/i.test(cleanSql)) {
+        const [name, email, password, role, branch, semester, roll_number, supabase_user_id, supabase_synced, supabase_synced_at] = cleanParams;
+        const newId = (tables.users || []).reduce((max, u) => Math.max(max, Number(u.id) || 0), 0) + 1;
+        const newUser = {
+          id: newId,
+          name: name || "",
+          email: String(email || "").toLowerCase().trim(),
+          password: password || "",
+          role: role || "student",
+          branch: branch || "Computer Science",
+          semester: Number(semester) || 1,
+          roll_number: roll_number || "",
+          avatar: "",
+          supabase_user_id: supabase_user_id || "",
+          supabase_synced: supabase_synced ?? 1,
+          supabase_synced_at: supabase_synced_at || new Date().toISOString(),
+          created_at: new Date().toISOString(),
+        };
+
+        // Check if user already exists
+        const existingIdx = (tables.users || []).findIndex((u) => u.email === newUser.email);
+        if (existingIdx >= 0) {
+          tables.users[existingIdx] = { ...tables.users[existingIdx], ...newUser, id: tables.users[existingIdx].id };
+          saveLocalCache();
+          return { insertId: tables.users[existingIdx].id, changes: 1 };
+        }
+
+        tables.users.push(newUser);
+        saveLocalCache();
+        return { insertId: newId, changes: 1 };
+      }
+
+      // INSERT INTO subjects
+      if (/INSERT\s+INTO\s+subjects/i.test(cleanSql)) {
+        const [code, name, branch, semester, description] = cleanParams;
+        const newId = (tables.subjects || []).reduce((max, s) => Math.max(max, Number(s.id) || 0), 0) + 1;
+        const newSubject = {
+          id: newId,
+          code: String(code || "").toUpperCase().trim(),
+          name: name || "",
+          branch: branch || "Computer Science",
+          semester: Number(semester) || 1,
+          description: description || "",
+          created_at: new Date().toISOString(),
+        };
+
+        tables.subjects.push(newSubject);
+        saveLocalCache();
+
+        // Write directly to Supabase PostgreSQL subjects table
+        supabase
+          .from("subjects")
+          .upsert([newSubject], { onConflict: "code" })
+          .then(({ error }) => {
+            if (error) console.warn("[DB] Supabase subjects insert notice:", error.message);
+          })
+          .catch(() => {});
+
+        return { insertId: newId, changes: 1 };
+      }
+
+      // INSERT INTO materials
+      if (/INSERT\s+INTO\s+materials/i.test(cleanSql)) {
+        const newId = (tables.materials || []).reduce((max, m) => Math.max(max, Number(m.id) || 0), 0) + 1;
+        const [
+          title,
+          type,
+          subject_id,
+          semester,
+          branch,
+          academic_year,
+          module_unit,
+          file_name,
+          file_path,
+          file_size,
+          file_type,
+          description,
+          uploader_id,
+          uploader_name,
+          downloads_count,
+          views_count,
+        ] = cleanParams;
+
+        const newMaterial = {
+          id: newId,
+          title: title || "",
+          type: type || "note",
+          subject_id: Number(subject_id) || 1,
+          semester: Number(semester) || 1,
+          branch: branch || "Computer Science",
+          academic_year: academic_year || "2024-25",
+          module_unit: module_unit || "Unit 1",
+          file_name: file_name || "",
+          file_path: file_path || "",
+          file_size: file_size || "1.2 MB",
+          file_type: file_type || "application/pdf",
+          description: description || "",
+          uploader_id: uploader_id || null,
+          uploader_name: uploader_name || "Faculty",
+          downloads_count: Number(downloads_count) || 0,
+          views_count: Number(views_count) || 0,
+          created_at: new Date().toISOString(),
+        };
+
+        tables.materials.push(newMaterial);
+        saveLocalCache();
+
+        // Sync to Supabase PostgreSQL materials table
+        supabase
+          .from("materials")
+          .insert([
+            {
+              title: newMaterial.title,
+              type: newMaterial.type,
+              subject_id: newMaterial.subject_id,
+              semester: newMaterial.semester,
+              branch: newMaterial.branch,
+              academic_year: newMaterial.academic_year,
+              module_unit: newMaterial.module_unit,
+              file_name: newMaterial.file_name,
+              file_path: newMaterial.file_path,
+              file_size: newMaterial.file_size,
+              file_type: newMaterial.file_type,
+              description: newMaterial.description,
+              uploader_name: newMaterial.uploader_name,
+              downloads_count: newMaterial.downloads_count,
+              views_count: newMaterial.views_count,
+            },
+          ])
+          .then(({ error }) => {
+            if (error) console.warn("[DB] Supabase materials sync notice:", error.message);
+          })
+          .catch(() => {});
+
+        return { insertId: newId, changes: 1 };
+      }
+
+      // INSERT INTO bookmarks
+      if (/INSERT\s+INTO\s+bookmarks/i.test(cleanSql)) {
+        const [user_id, material_id] = cleanParams;
+        const newId = (tables.bookmarks || []).reduce((max, b) => Math.max(max, Number(b.id) || 0), 0) + 1;
+        const newBm = {
+          id: newId,
+          user_id,
+          material_id: Number(material_id),
+          created_at: new Date().toISOString(),
+        };
+        tables.bookmarks.push(newBm);
+        saveLocalCache();
+        return { insertId: newId, changes: 1 };
+      }
+
+      // INSERT INTO quiz_history
+      if (/INSERT\s+INTO\s+quiz_history/i.test(cleanSql)) {
+        const [user_id, subject_name, topic, score, total_questions] = cleanParams;
+        const newId = (tables.quiz_history || []).reduce((max, q) => Math.max(max, Number(q.id) || 0), 0) + 1;
+        const newQuiz = {
+          id: newId,
+          user_id,
+          subject_name: subject_name || "General",
+          topic: topic || "Practice Quiz",
+          score: Number(score) || 0,
+          total_questions: Number(total_questions) || 5,
+          created_at: new Date().toISOString(),
+        };
+        tables.quiz_history.push(newQuiz);
+        saveLocalCache();
+        return { insertId: newId, changes: 1 };
+      }
+
+      // UPDATE materials views_count
+      if (/UPDATE\s+materials\s+SET\s+views_count\s*=\s*views_count\s*\+\s*1\s+WHERE\s+id\s*=\s*\?/i.test(cleanSql)) {
+        const matId = Number(cleanParams[0]);
+        const mat = (tables.materials || []).find((m) => m.id === matId);
+        if (mat) {
+          mat.views_count = (mat.views_count || 0) + 1;
+          saveLocalCache();
+        }
+        return { changes: 1 };
+      }
+
+      // UPDATE materials downloads_count
+      if (/UPDATE\s+materials\s+SET\s+downloads_count\s*=\s*downloads_count\s*\+\s*1\s+WHERE\s+id\s*=\s*\?/i.test(cleanSql)) {
+        const matId = Number(cleanParams[0]);
+        const mat = (tables.materials || []).find((m) => m.id === matId);
+        if (mat) {
+          mat.downloads_count = (mat.downloads_count || 0) + 1;
+          saveLocalCache();
+        }
+        return { changes: 1 };
+      }
+
+      // UPDATE users profile
+      if (/UPDATE\s+users\s+SET\s+name\s*=\s*\?/i.test(cleanSql)) {
+        const [name, branch, semester, roll_number, avatar, id] = cleanParams;
+        const u = (tables.users || []).find((user) => user.id === id || String(user.id) === String(id));
+        if (u) {
+          if (name) u.name = name;
+          if (branch) u.branch = branch;
+          if (semester) u.semester = semester;
+          if (roll_number !== undefined) u.roll_number = roll_number;
+          if (avatar !== undefined) u.avatar = avatar;
+          saveLocalCache();
+
+          // Sync to Supabase registrations table
+          if (u.email) {
+            supabase
+              .from("registrations")
+              .update({
+                name: u.name,
+                branch: u.branch,
+                semester: u.semester,
+                roll_number: u.roll_number,
+                avatar_url: u.avatar || "",
+                updated_at: new Date().toISOString(),
+              })
+              .eq("email", u.email.toLowerCase().trim())
+              .then(() => {})
+              .catch(() => {});
+          }
+        }
+        return { changes: 1 };
+      }
+
+      // DELETE FROM bookmarks
+      if (/DELETE\s+FROM\s+bookmarks/i.test(cleanSql)) {
+        if (/WHERE\s+id\s*=\s*\?/i.test(cleanSql)) {
+          const idVal = cleanParams[0];
+          tables.bookmarks = (tables.bookmarks || []).filter((b) => b.id !== idVal && Number(b.id) !== Number(idVal));
+        } else if (/WHERE\s+user_id\s*=\s*\?/i.test(cleanSql)) {
+          const uId = cleanParams[0];
+          tables.bookmarks = (tables.bookmarks || []).filter((b) => b.user_id !== uId && String(b.user_id) !== String(uId));
+        } else if (/WHERE\s+material_id\s*=\s*\?/i.test(cleanSql)) {
+          const mId = cleanParams[0];
+          tables.bookmarks = (tables.bookmarks || []).filter((b) => b.material_id !== mId && Number(b.material_id) !== Number(mId));
+        }
+        saveLocalCache();
+        return { changes: 1 };
+      }
+
+      // DELETE FROM materials
+      if (/DELETE\s+FROM\s+materials\s+WHERE\s+id\s*=\s*\?/i.test(cleanSql)) {
+        const matId = Number(cleanParams[0]);
+        tables.materials = (tables.materials || []).filter((m) => m.id !== matId);
+        saveLocalCache();
+        return { changes: 1 };
+      }
+
+      // DELETE FROM subjects
+      if (/DELETE\s+FROM\s+subjects\s+WHERE\s+id\s*=\s*\?/i.test(cleanSql)) {
+        const subId = Number(cleanParams[0]);
+        tables.subjects = (tables.subjects || []).filter((s) => s.id !== subId);
+        saveLocalCache();
+        return { changes: 1 };
+      }
+
+      // DELETE FROM users
+      if (/DELETE\s+FROM\s+users\s+WHERE\s+id\s*=\s*\?/i.test(cleanSql)) {
+        const uId = cleanParams[0];
+        const target = (tables.users || []).find((u) => u.id === uId || String(u.id) === String(uId));
+        tables.users = (tables.users || []).filter((u) => u.id !== uId && String(u.id) !== String(uId));
+        saveLocalCache();
+
+        if (target?.email) {
+          supabase
+            .from("registrations")
+            .delete()
+            .eq("email", target.email.toLowerCase().trim())
+            .then(() => {})
+            .catch(() => {});
+        }
+        return { changes: 1 };
+      }
+
+      return { changes: 1 };
     },
   };
 

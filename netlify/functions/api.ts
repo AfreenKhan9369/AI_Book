@@ -9,7 +9,11 @@ export const handler = async (event: any, context: any) => {
   }
 
   // Ensure DB tables and default records exist on cold starts
-  await ensureDatabase();
+  try {
+    await ensureDatabase();
+  } catch (err) {
+    console.warn("[Netlify Function] Non-fatal database initialization notice:", err);
+  }
 
   return serverlessHandler(event, context);
 };

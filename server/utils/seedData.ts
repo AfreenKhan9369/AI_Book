@@ -90,98 +90,20 @@ ${400 + streamLength}
 export async function initDatabaseAndSeed(): Promise<void> {
   const db = await getDatabase();
 
-  // Create uploads directory
-  const uploadsDir = path.join(process.cwd(), "uploads");
-  if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir, { recursive: true });
+  // Create uploads directory (support serverless /tmp fallback if read-only)
+  let uploadsDir = path.join(process.cwd(), "uploads");
+  try {
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+  } catch {
+    uploadsDir = path.join("/tmp", "uploads");
+    if (!fs.existsSync(uploadsDir)) {
+      try {
+        fs.mkdirSync(uploadsDir, { recursive: true });
+      } catch {}
+    }
   }
-
-  // Create tables
-  await db.execute(`
-    CREATE TABLE IF NOT EXISTS users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
-      email TEXT UNIQUE NOT NULL,
-      password TEXT NOT NULL,
-      role TEXT DEFAULT 'student',
-      branch TEXT DEFAULT 'Computer Science',
-      semester INTEGER DEFAULT 4,
-      roll_number TEXT DEFAULT '',
-      avatar TEXT DEFAULT '',
-      supabase_user_id TEXT DEFAULT '',
-      supabase_synced INTEGER DEFAULT 0,
-      supabase_synced_at TEXT DEFAULT '',
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP
-    );
-  `);
-
-  // Ensure columns exist on already-initialized databases
-  try {
-    await db.execute("ALTER TABLE users ADD COLUMN supabase_user_id TEXT DEFAULT '';");
-  } catch {}
-  try {
-    await db.execute("ALTER TABLE users ADD COLUMN supabase_synced INTEGER DEFAULT 0;");
-  } catch {}
-  try {
-    await db.execute("ALTER TABLE users ADD COLUMN supabase_synced_at TEXT DEFAULT '';");
-  } catch {}
-
-  await db.execute(`
-    CREATE TABLE IF NOT EXISTS subjects (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      code TEXT UNIQUE NOT NULL,
-      name TEXT NOT NULL,
-      branch TEXT NOT NULL,
-      semester INTEGER NOT NULL,
-      description TEXT DEFAULT '',
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP
-    );
-  `);
-
-  await db.execute(`
-    CREATE TABLE IF NOT EXISTS materials (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      title TEXT NOT NULL,
-      type TEXT NOT NULL, -- 'note' or 'pyq'
-      subject_id INTEGER NOT NULL,
-      semester INTEGER NOT NULL,
-      branch TEXT NOT NULL,
-      academic_year TEXT DEFAULT '2024-25',
-      module_unit TEXT DEFAULT 'Unit 1',
-      file_name TEXT NOT NULL,
-      file_path TEXT NOT NULL,
-      file_size TEXT DEFAULT '1.2 MB',
-      file_type TEXT DEFAULT 'application/pdf',
-      description TEXT DEFAULT '',
-      uploader_id INTEGER NOT NULL,
-      uploader_name TEXT NOT NULL,
-      downloads_count INTEGER DEFAULT 0,
-      views_count INTEGER DEFAULT 0,
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP
-    );
-  `);
-
-  await db.execute(`
-    CREATE TABLE IF NOT EXISTS bookmarks (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id INTEGER NOT NULL,
-      material_id INTEGER NOT NULL,
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE(user_id, material_id)
-    );
-  `);
-
-  await db.execute(`
-    CREATE TABLE IF NOT EXISTS quiz_history (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id INTEGER NOT NULL,
-      subject_name TEXT NOT NULL,
-      topic TEXT NOT NULL,
-      score INTEGER NOT NULL,
-      total_questions INTEGER NOT NULL,
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP
-    );
-  `);
 
   // Check if users exist
   const existingUsers = await db.query("SELECT COUNT(*) as count FROM users;");

@@ -1,13 +1,19 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
 export const SUPABASE_PROJECT_ID =
-  process.env.SUPABASE_PROJECT_ID || "udsvohrfzzeanqnjfazb";
+  process.env.SUPABASE_PROJECT_ID ||
+  process.env.VITE_SUPABASE_PROJECT_ID ||
+  "udsvohrfzzeanqnjfazb";
 
 export const SUPABASE_URL =
-  process.env.SUPABASE_URL || `https://${SUPABASE_PROJECT_ID}.supabase.co`;
+  process.env.SUPABASE_URL ||
+  process.env.VITE_SUPABASE_URL ||
+  `https://${SUPABASE_PROJECT_ID}.supabase.co`;
 
 export const SUPABASE_ANON_KEY =
+  process.env.SUPABASE_SERVICE_ROLE_KEY ||
   process.env.SUPABASE_ANON_KEY ||
+  process.env.VITE_SUPABASE_ANON_KEY ||
   "sb_publishable_4Jt6bVElnKJlpU_qqP4dkA_lOihoATw";
 
 let supabaseInstance: SupabaseClient | null = null;
