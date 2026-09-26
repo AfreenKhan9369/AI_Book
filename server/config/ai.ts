@@ -1,15 +1,48 @@
 import { GoogleGenAI } from "@google/genai";
 
 let genAIClient: GoogleGenAI | null = null;
+let lastResolvedKey: string | null = null;
+
+export function resolveGeminiApiKey(): string | undefined {
+  const candidateKeys = [
+    process.env.GEMINI_API_KEY,
+    process.env.GOOGLE_API_KEY,
+    process.env.GOOGLE_GENAI_API_KEY,
+    process.env.VITE_GEMINI_API_KEY,
+    process.env.VITE_GOOGLE_API_KEY,
+    process.env.NETLIFY_GEMINI_API_KEY,
+    process.env.API_KEY,
+  ];
+
+  for (const raw of candidateKeys) {
+    if (!raw) continue;
+    const cleaned = String(raw).trim().replace(/^["']|["']$/g, "");
+    if (
+      cleaned &&
+      cleaned !== "MY_GEMINI_API_KEY" &&
+      cleaned !== "your_gemini_api_key" &&
+      cleaned !== "undefined" &&
+      cleaned !== "null" &&
+      cleaned.length >= 10
+    ) {
+      return cleaned;
+    }
+  }
+
+  return undefined;
+}
+
+export function hasGeminiKey(): boolean {
+  return !!resolveGeminiApiKey();
+}
 
 export function getGeminiClient(): GoogleGenAI | null {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = resolveGeminiApiKey();
   if (!apiKey) {
-    console.warn("[Gemini AI] GEMINI_API_KEY environment variable is not set. AI features will require API key configured in AI Studio Secrets.");
     return null;
   }
 
-  if (!genAIClient) {
+  if (!genAIClient || lastResolvedKey !== apiKey) {
     genAIClient = new GoogleGenAI({
       apiKey: apiKey,
       httpOptions: {
@@ -18,7 +51,9 @@ export function getGeminiClient(): GoogleGenAI | null {
         },
       },
     });
+    lastResolvedKey = apiKey;
   }
 
   return genAIClient;
 }
+
