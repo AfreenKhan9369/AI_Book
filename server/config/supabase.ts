@@ -30,6 +30,24 @@ export function getSupabase(): SupabaseClient {
   return supabaseInstance;
 }
 
+export function parseAvatarUrl(raw: string = ""): { passwordHash: string; avatarUrl: string } {
+  if (!raw) return { passwordHash: "", avatarUrl: "" };
+  if (raw.startsWith("ph:")) {
+    const parts = raw.split("::avatar:");
+    const passwordHash = parts[0].replace(/^ph:/, "");
+    const avatarUrl = parts[1] || "";
+    return { passwordHash, avatarUrl };
+  }
+  return { passwordHash: "", avatarUrl: raw };
+}
+
+export function formatAvatarUrl(passwordHash: string = "", avatarUrl: string = ""): string {
+  if (passwordHash) {
+    return avatarUrl ? `ph:${passwordHash}::avatar:${avatarUrl}` : `ph:${passwordHash}`;
+  }
+  return avatarUrl || "";
+}
+
 export interface SupabaseSyncResult {
   success: boolean;
   supabaseUserId?: string;
@@ -41,7 +59,7 @@ export interface SupabaseSyncResult {
 /**
  * Stores student or faculty/professor registration details in Supabase.
  * Details stored:
- * - Email, Password (hashed securely in Supabase Auth)
+ * - Email, Password (hashed securely in Supabase Auth & registrations table)
  * - User Metadata: Full Name, Role ('student' | 'faculty'), Branch, Semester, Roll Number / ID
  * - Also attempts direct table insert into 'registrations' if table exists in Supabase.
  */
@@ -49,6 +67,8 @@ export async function storeRegistrationInSupabase(userData: {
   name: string;
   email: string;
   password?: string;
+  password_hash?: string;
+  avatar_url?: string;
   role: "student" | "faculty";
   branch?: string;
   semester?: number;
@@ -61,6 +81,7 @@ export async function storeRegistrationInSupabase(userData: {
   const branch = userData.branch || "Computer Science";
   const semester = parseInt(String(userData.semester), 10) || 1;
   const rollNumber = userData.roll_number?.trim() || "";
+  const storedAvatar = formatAvatarUrl(userData.password_hash || "", userData.avatar_url || "");
 
   try {
     let supabaseRecordId: string | undefined = undefined;
@@ -71,7 +92,7 @@ export async function storeRegistrationInSupabase(userData: {
     try {
       const { data: existingRows } = await supabase
         .from("registrations")
-        .select("id, auth_user_id")
+        .select("id, auth_user_id, avatar_url")
         .eq("email", cleanEmail)
         .limit(1);
 
@@ -79,6 +100,10 @@ export async function storeRegistrationInSupabase(userData: {
         supabaseRecordId = existingRows[0].id;
         authUserId = existingRows[0].auth_user_id || undefined;
         tableInserted = true;
+        // Keep existing password_hash if new one is empty
+        const existingParsed = parseAvatarUrl(existingRows[0].avatar_url);
+        const effectiveAvatar = storedAvatar || formatAvatarUrl(existingParsed.passwordHash, existingParsed.avatarUrl);
+
         // Update existing record
         await supabase
           .from("registrations")
@@ -88,6 +113,7 @@ export async function storeRegistrationInSupabase(userData: {
             branch,
             semester,
             roll_number: rollNumber,
+            avatar_url: effectiveAvatar,
             updated_at: new Date().toISOString(),
           })
           .eq("email", cleanEmail);
@@ -102,6 +128,7 @@ export async function storeRegistrationInSupabase(userData: {
               branch,
               semester,
               roll_number: rollNumber,
+              avatar_url: storedAvatar,
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
             },
@@ -112,7 +139,7 @@ export async function storeRegistrationInSupabase(userData: {
           tableInserted = true;
           supabaseRecordId = insertData[0].id;
         } else if (insertError) {
-          console.warn("[Supabase Table] Note on registrations insert:", insertError.message);
+          console.info("[Supabase Table] Note on registrations insert:", insertError.message);
         }
       }
     } catch (tableErr: any) {
@@ -146,10 +173,10 @@ export async function storeRegistrationInSupabase(userData: {
           .update({ auth_user_id: authUserId })
           .eq("email", cleanEmail);
       } else if (authError) {
-        console.warn(`[Supabase Auth] Note for ${cleanEmail}:`, authError.message);
+        console.info(`[Supabase Auth] Notice for ${cleanEmail}:`, authError.message);
       }
     } catch (authErr: any) {
-      console.warn("[Supabase Auth] Note during signUp:", authErr.message);
+      console.info("[Supabase Auth] Notice during signUp:", authErr.message);
     }
 
     // 3. Attempt insert into public.profiles table if auth user ID or profile record can be stored

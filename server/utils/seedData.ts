@@ -105,18 +105,18 @@ export async function initDatabaseAndSeed(): Promise<void> {
     }
   }
 
-  // Check if users exist
-  const existingUsers = await db.query("SELECT COUNT(*) as count FROM users;");
-  const userCount = Number(existingUsers[0]?.count || 0);
+  // Check and ensure default demo accounts have verified password hashes
+  const salt = await bcrypt.genSalt(10);
+  const facultyPasswordHash = await bcrypt.hash("faculty123", salt);
+  const studentPasswordHash = await bcrypt.hash("student123", salt);
 
   let facultyId = 1;
   let studentId = 2;
 
-  if (userCount === 0) {
-    const salt = await bcrypt.genSalt(10);
-    const facultyPasswordHash = await bcrypt.hash("faculty123", salt);
-    const studentPasswordHash = await bcrypt.hash("student123", salt);
+  const facultyUser = await db.getOne("SELECT id, password FROM users WHERE email = ?;", ["faculty@college.edu"]);
+  const studentUser = await db.getOne("SELECT id, password FROM users WHERE email = ?;", ["student@college.edu"]);
 
+  if (!facultyUser) {
     const facultyRes = await db.execute(
       `INSERT INTO users (name, email, password, role, branch, semester, roll_number, avatar) 
        VALUES (?, ?, ?, ?, ?, ?, ?, ?);`,
@@ -131,8 +131,15 @@ export async function initDatabaseAndSeed(): Promise<void> {
         "",
       ]
     );
-    facultyId = facultyRes.insertId || 1;
+    facultyId = Number(facultyRes.insertId) || 1;
+  } else {
+    facultyId = Number(facultyUser.id) || 1;
+    if (!facultyUser.password || facultyUser.password.length < 10) {
+      await db.execute("UPDATE users SET password = ? WHERE id = ?;", [facultyPasswordHash, facultyId]);
+    }
+  }
 
+  if (!studentUser) {
     const studentRes = await db.execute(
       `INSERT INTO users (name, email, password, role, branch, semester, roll_number, avatar) 
        VALUES (?, ?, ?, ?, ?, ?, ?, ?);`,
@@ -147,8 +154,12 @@ export async function initDatabaseAndSeed(): Promise<void> {
         "",
       ]
     );
-    studentId = studentRes.insertId || 2;
-    console.log("[DB Seed] Seeded default faculty and student accounts.");
+    studentId = Number(studentRes.insertId) || 2;
+  } else {
+    studentId = Number(studentUser.id) || 2;
+    if (!studentUser.password || studentUser.password.length < 10) {
+      await db.execute("UPDATE users SET password = ? WHERE id = ?;", [studentPasswordHash, studentId]);
+    }
   }
 
   // Check if subjects exist

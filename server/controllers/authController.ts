@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import { getDatabase } from "../config/db.js";
 import { generateToken, AuthRequest } from "../middleware/auth.js";
-import { storeRegistrationInSupabase, getSupabase } from "../config/supabase.js";
+import { storeRegistrationInSupabase, getSupabase, parseAvatarUrl } from "../config/supabase.js";
 
 export async function register(req: Request, res: Response): Promise<void> {
   try {
@@ -28,42 +28,47 @@ export async function register(req: Request, res: Response): Promise<void> {
     const cleanEmail = email.toLowerCase().trim();
     const supabase = getSupabase();
 
-    // Check if user exists in local database or Supabase registrations table
-    const existing = await db.getOne("SELECT id FROM users WHERE email = ?;", [cleanEmail]);
-    if (existing) {
-      res.status(409).json({ message: "An account with this email already exists." });
-      return;
-    }
-
+    // 1. Verify existence against live Supabase PostgreSQL database
+    let existsInSupabase = false;
     try {
-      const { data: existingSupa } = await supabase
+      const { data: supaReg } = await supabase
         .from("registrations")
         .select("id")
         .eq("email", cleanEmail)
         .maybeSingle();
 
-      if (existingSupa) {
-        res.status(409).json({ message: "An account with this email is already registered in Supabase." });
-        return;
+      if (supaReg) {
+        existsInSupabase = true;
       }
     } catch {}
+
+    const isDemoAccount = cleanEmail === "faculty@college.edu" || cleanEmail === "student@college.edu";
+
+    if (existsInSupabase || isDemoAccount) {
+      res.status(409).json({ message: "An account with this email already exists." });
+      return;
+    }
+
+    // If the student was deleted from Supabase database, purge any stale cached local entry
+    await db.execute("DELETE FROM users WHERE email = ?;", [cleanEmail]);
 
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
     const assignedRole = role === "faculty" || role === "admin" ? "faculty" : "student";
 
-    // 1. Store registration details in Supabase PostgreSQL & Auth
+    // 2. Store registration details and password hash in Supabase PostgreSQL & Auth
     const supabaseSync = await storeRegistrationInSupabase({
       name: name.trim(),
       email: cleanEmail,
       password,
+      password_hash: hashedPassword,
       role: assignedRole,
       branch,
       semester: parseInt(semester, 10) || 1,
       roll_number: roll_number.trim(),
     });
 
-    // 2. Store in database with Supabase sync tracking
+    // 3. Store in database with Supabase sync tracking
     const insertResult = await db.execute(
       `INSERT INTO users (name, email, password, role, branch, semester, roll_number, supabase_user_id, supabase_synced, supabase_synced_at) 
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
@@ -81,7 +86,7 @@ export async function register(req: Request, res: Response): Promise<void> {
       ]
     );
 
-    const newUserId = insertResult.insertId!;
+    const newUserId = Number(insertResult.insertId) || 1;
     const userPayload = {
       id: newUserId,
       name: name.trim(),
@@ -90,6 +95,7 @@ export async function register(req: Request, res: Response): Promise<void> {
       branch,
       semester: parseInt(semester, 10) || 1,
       roll_number: roll_number.trim(),
+      avatar: "",
       supabase_synced: supabaseSync.success,
       supabase_id: supabaseSync.supabaseUserId || null,
     };
@@ -117,23 +123,84 @@ export async function login(req: Request, res: Response): Promise<void> {
       return;
     }
 
+    const cleanEmail = email.toLowerCase().trim();
     const db = await getDatabase();
+    const supabase = getSupabase();
+
+    // 1. Fast match for built-in demo accounts
+    let isMatch = false;
+    if (cleanEmail === "faculty@college.edu" && password === "faculty123") {
+      isMatch = true;
+    } else if (cleanEmail === "student@college.edu" && password === "student123") {
+      isMatch = true;
+    }
+
+    // 2. Look up user in database (handles in-memory cache and Supabase sync)
     let user = await db.getOne(
       "SELECT id, name, email, password, role, branch, semester, roll_number, avatar, supabase_user_id, supabase_synced FROM users WHERE email = ?;",
-      [email.toLowerCase().trim()]
+      [cleanEmail]
     );
 
+    // 3. If user not in local database, fetch directly from Supabase registrations
     if (!user) {
-      // Check if user registered directly in Supabase
       try {
-        const supabase = getSupabase();
+        const { data: supaReg } = await supabase
+          .from("registrations")
+          .select("*")
+          .eq("email", cleanEmail)
+          .maybeSingle();
+
+        if (supaReg) {
+          const { passwordHash, avatarUrl } = parseAvatarUrl(supaReg.avatar_url || "");
+          const insertRes = await db.execute(
+            `INSERT INTO users (name, email, password, role, branch, semester, roll_number, avatar, supabase_user_id, supabase_synced, supabase_synced_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP);`,
+            [
+              supaReg.name,
+              cleanEmail,
+              passwordHash || "",
+              supaReg.role || "student",
+              supaReg.branch || "Computer Science",
+              supaReg.semester || 1,
+              supaReg.roll_number || "",
+              avatarUrl || "",
+              supaReg.auth_user_id || supaReg.id,
+            ]
+          );
+          user = {
+            id: insertRes.insertId,
+            name: supaReg.name,
+            email: cleanEmail,
+            password: passwordHash || "",
+            role: supaReg.role || "student",
+            branch: supaReg.branch || "Computer Science",
+            semester: supaReg.semester || 1,
+            roll_number: supaReg.roll_number || "",
+            avatar: avatarUrl || "",
+            supabase_user_id: supaReg.auth_user_id || supaReg.id,
+            supabase_synced: 1,
+          };
+        }
+      } catch (err) {
+        console.warn("[Auth] Supabase lookup error:", err);
+      }
+    }
+
+    // 4. Supabase Auth fallback if still not found
+    if (!user) {
+      try {
         const { data: supaLogin, error: supaError } = await supabase.auth.signInWithPassword({
-          email: email.toLowerCase().trim(),
+          email: cleanEmail,
           password,
         });
 
-        if (!supaError && supaLogin?.user) {
-          const meta = supaLogin.user.user_metadata || {};
+        const credentialsConfirmed =
+          !!supaLogin?.user ||
+          (supaError && supaError.message.toLowerCase().includes("email not confirmed"));
+
+        if (credentialsConfirmed) {
+          isMatch = true;
+          const meta = supaLogin?.user?.user_metadata || {};
           const salt = await bcrypt.genSalt(10);
           const hashedPassword = await bcrypt.hash(password, salt);
           const assignedRole = meta.role === "faculty" || meta.role === "admin" ? "faculty" : "student";
@@ -141,27 +208,27 @@ export async function login(req: Request, res: Response): Promise<void> {
             `INSERT INTO users (name, email, password, role, branch, semester, roll_number, supabase_user_id, supabase_synced, supabase_synced_at)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP);`,
             [
-              meta.name || email.split("@")[0],
-              email.toLowerCase().trim(),
+              meta.name || cleanEmail.split("@")[0],
+              cleanEmail,
               hashedPassword,
               assignedRole,
               meta.branch || "Computer Science",
               meta.semester || 4,
               meta.roll_number || "",
-              supaLogin.user.id,
+              supaLogin?.user?.id || "",
             ]
           );
           user = {
             id: resInsert.insertId,
-            name: meta.name || email.split("@")[0],
-            email: email.toLowerCase().trim(),
+            name: meta.name || cleanEmail.split("@")[0],
+            email: cleanEmail,
             password: hashedPassword,
             role: assignedRole,
             branch: meta.branch || "Computer Science",
             semester: meta.semester || 4,
             roll_number: meta.roll_number || "",
             avatar: "",
-            supabase_user_id: supaLogin.user.id,
+            supabase_user_id: supaLogin?.user?.id || "",
             supabase_synced: 1,
           };
         }
@@ -175,11 +242,46 @@ export async function login(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    const isMatch = await bcrypt.compare(password, user.password);
+    // 5. Verify password
+    if (!isMatch) {
+      // 5.1 Check bcrypt hash if present
+      if (user.password && user.password.length > 10) {
+        try {
+          isMatch = await bcrypt.compare(password, user.password);
+        } catch {
+          isMatch = false;
+        }
+      }
+
+      // 5.2 Supabase Auth verification check
+      if (!isMatch) {
+        try {
+          const { data: supaLogin, error: supaError } = await supabase.auth.signInWithPassword({
+            email: cleanEmail,
+            password,
+          });
+
+          // Session returned OR "Email not confirmed" confirms the user password was correct!
+          if (supaLogin?.user || (supaError && supaError.message.toLowerCase().includes("email not confirmed"))) {
+            isMatch = true;
+            // Upgrade password hash locally and in Supabase registrations
+            const salt = await bcrypt.genSalt(10);
+            const newHash = await bcrypt.hash(password, salt);
+            user.password = newHash;
+            await db.execute("UPDATE users SET password = ? WHERE id = ?;", [newHash, user.id]);
+          }
+        } catch (supaErr) {
+          console.warn("[Auth] Supabase Auth check error:", supaErr);
+        }
+      }
+    }
+
     if (!isMatch) {
       res.status(401).json({ message: "Invalid email or password." });
       return;
     }
+
+    const { avatarUrl } = parseAvatarUrl(user.avatar || "");
 
     const userPayload = {
       id: user.id,
@@ -189,7 +291,7 @@ export async function login(req: Request, res: Response): Promise<void> {
       branch: user.branch,
       semester: user.semester,
       roll_number: user.roll_number,
-      avatar: user.avatar,
+      avatar: avatarUrl || "",
     };
 
     const token = generateToken(userPayload);
@@ -223,6 +325,12 @@ export async function getMe(req: AuthRequest, res: Response): Promise<void> {
       return;
     }
 
+    const { avatarUrl } = parseAvatarUrl(user.avatar || "");
+    const cleanUser = {
+      ...user,
+      avatar: avatarUrl || "",
+    };
+
     // Get user bookmarks
     const bookmarks = await db.query(
       "SELECT material_id FROM bookmarks WHERE user_id = ?;",
@@ -237,7 +345,7 @@ export async function getMe(req: AuthRequest, res: Response): Promise<void> {
     );
 
     res.json({
-      user,
+      user: cleanUser,
       bookmarkedIds,
       quizStats: {
         totalQuizzes: Number(quizStats[0]?.count || 0),
@@ -275,9 +383,14 @@ export async function updateProfile(req: AuthRequest, res: Response): Promise<vo
       [req.user.id]
     );
 
+    const { avatarUrl } = parseAvatarUrl(updatedUser?.avatar || "");
+
     res.json({
       message: "Profile updated successfully!",
-      user: updatedUser,
+      user: {
+        ...updatedUser,
+        avatar: avatarUrl || "",
+      },
     });
   } catch (error: any) {
     console.error("[Auth] Update profile error:", error);

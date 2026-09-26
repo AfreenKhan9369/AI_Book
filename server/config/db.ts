@@ -1,6 +1,10 @@
 import path from "node:path";
 import fs from "node:fs";
-import { getSupabase } from "./supabase.js";
+import { getSupabase, parseAvatarUrl, formatAvatarUrl } from "./supabase.js";
+
+const safeRun = (promiseLike: any) => {
+  Promise.resolve(promiseLike).catch(() => {});
+};
 
 export interface DatabaseAdapter {
   query<T = any>(sql: string, params?: any[]): Promise<T[]>;
@@ -133,22 +137,49 @@ export async function getDatabase(): Promise<DatabaseAdapter> {
       tables.quiz_history = qhRes.value.data;
     }
 
-    if (regRes.status === "fulfilled" && regRes.value.data && regRes.value.data.length > 0) {
-      const existingUserMap = new Map(tables.users.map((u) => [u.email, u]));
+    if (regRes.status === "fulfilled" && regRes.value.data && Array.isArray(regRes.value.data)) {
+      const liveSupaEmails = new Set(regRes.value.data.map((r: any) => String(r.email || "").toLowerCase().trim()));
+
+      // 1. Prune local cache users that were deleted from Supabase (preserving built-in demo accounts)
+      tables.users = (tables.users || []).filter((u) => {
+        const uEmail = String(u.email || "").toLowerCase().trim();
+        if (uEmail === "faculty@college.edu" || uEmail === "student@college.edu") return true;
+        return liveSupaEmails.has(uEmail);
+      });
+
+      // 2. Add or update users from Supabase registrations
+      const existingUserMap = new Map(tables.users.map((u) => [String(u.email || "").toLowerCase().trim(), u]));
       let nextId = tables.users.reduce((max, u) => Math.max(max, Number(u.id) || 0), 0) + 1;
 
       for (const reg of regRes.value.data) {
-        if (!existingUserMap.has(reg.email)) {
+        const regEmail = String(reg.email || "").toLowerCase().trim();
+        const { passwordHash, avatarUrl } = parseAvatarUrl(reg.avatar_url || "");
+
+        if (existingUserMap.has(regEmail)) {
+          const current = existingUserMap.get(regEmail)!;
+          current.name = reg.name || current.name;
+          current.role = reg.role || current.role;
+          current.branch = reg.branch || current.branch;
+          current.semester = reg.semester || current.semester;
+          current.roll_number = reg.roll_number ?? current.roll_number;
+          current.avatar = avatarUrl || current.avatar;
+          // Preserve valid local password hash; only populate if current is empty
+          if (passwordHash && !current.password) {
+            current.password = passwordHash;
+          }
+          current.supabase_user_id = reg.auth_user_id || reg.id;
+          current.supabase_synced = 1;
+        } else {
           tables.users.push({
             id: nextId++,
             name: reg.name,
-            email: reg.email,
-            password: "",
-            role: reg.role,
-            branch: reg.branch,
-            semester: reg.semester,
-            roll_number: reg.roll_number,
-            avatar: reg.avatar_url || "",
+            email: regEmail,
+            password: passwordHash || "",
+            role: reg.role || "student",
+            branch: reg.branch || "Computer Science",
+            semester: reg.semester || 1,
+            roll_number: reg.roll_number || "",
+            avatar: avatarUrl || "",
             supabase_user_id: reg.auth_user_id || reg.id,
             supabase_synced: 1,
             supabase_synced_at: reg.updated_at || reg.created_at,
@@ -339,16 +370,17 @@ export async function getDatabase(): Promise<DatabaseAdapter> {
           const { data } = await supabase.from("registrations").select("*").eq("email", email).maybeSingle();
           if (data) {
             const nextId = (tables.users || []).length + 1;
+            const { passwordHash, avatarUrl } = parseAvatarUrl(data.avatar_url || "");
             const mappedUser = {
               id: nextId,
               name: data.name,
-              email: data.email,
-              password: "",
-              role: data.role,
-              branch: data.branch,
-              semester: data.semester,
-              roll_number: data.roll_number,
-              avatar: data.avatar_url || "",
+              email: String(data.email || "").toLowerCase().trim(),
+              password: passwordHash || "",
+              role: data.role || "student",
+              branch: data.branch || "Computer Science",
+              semester: data.semester || 1,
+              roll_number: data.roll_number || "",
+              avatar: avatarUrl || "",
               supabase_user_id: data.auth_user_id || data.id,
               supabase_synced: 1,
               supabase_synced_at: data.updated_at || data.created_at,
@@ -468,13 +500,14 @@ export async function getDatabase(): Promise<DatabaseAdapter> {
         saveLocalCache();
 
         // Write directly to Supabase PostgreSQL subjects table
-        supabase
-          .from("subjects")
-          .upsert([newSubject], { onConflict: "code" })
-          .then(({ error }) => {
-            if (error) console.warn("[DB] Supabase subjects insert notice:", error.message);
-          })
-          .catch(() => {});
+        safeRun(
+          supabase
+            .from("subjects")
+            .upsert([newSubject], { onConflict: "code" })
+            .then(({ error }) => {
+              if (error) console.warn("[DB] Supabase subjects insert notice:", error.message);
+            })
+        );
 
         return { insertId: newId, changes: 1 };
       }
@@ -526,31 +559,32 @@ export async function getDatabase(): Promise<DatabaseAdapter> {
         saveLocalCache();
 
         // Sync to Supabase PostgreSQL materials table
-        supabase
-          .from("materials")
-          .insert([
-            {
-              title: newMaterial.title,
-              type: newMaterial.type,
-              subject_id: newMaterial.subject_id,
-              semester: newMaterial.semester,
-              branch: newMaterial.branch,
-              academic_year: newMaterial.academic_year,
-              module_unit: newMaterial.module_unit,
-              file_name: newMaterial.file_name,
-              file_path: newMaterial.file_path,
-              file_size: newMaterial.file_size,
-              file_type: newMaterial.file_type,
-              description: newMaterial.description,
-              uploader_name: newMaterial.uploader_name,
-              downloads_count: newMaterial.downloads_count,
-              views_count: newMaterial.views_count,
-            },
-          ])
-          .then(({ error }) => {
-            if (error) console.warn("[DB] Supabase materials sync notice:", error.message);
-          })
-          .catch(() => {});
+        safeRun(
+          supabase
+            .from("materials")
+            .insert([
+              {
+                title: newMaterial.title,
+                type: newMaterial.type,
+                subject_id: newMaterial.subject_id,
+                semester: newMaterial.semester,
+                branch: newMaterial.branch,
+                academic_year: newMaterial.academic_year,
+                module_unit: newMaterial.module_unit,
+                file_name: newMaterial.file_name,
+                file_path: newMaterial.file_path,
+                file_size: newMaterial.file_size,
+                file_type: newMaterial.file_type,
+                description: newMaterial.description,
+                uploader_name: newMaterial.uploader_name,
+                downloads_count: newMaterial.downloads_count,
+                views_count: newMaterial.views_count,
+              },
+            ])
+            .then(({ error }) => {
+              if (error) console.warn("[DB] Supabase materials sync notice:", error.message);
+            })
+        );
 
         return { insertId: newId, changes: 1 };
       }
@@ -610,6 +644,29 @@ export async function getDatabase(): Promise<DatabaseAdapter> {
         return { changes: 1 };
       }
 
+      // UPDATE users password
+      if (/UPDATE\s+users\s+SET\s+password\s*=\s*\?/i.test(cleanSql)) {
+        const [pwd, idOrEmail] = cleanParams;
+        const u = (tables.users || []).find(
+          (user) => user.id === idOrEmail || String(user.id) === String(idOrEmail) || user.email === String(idOrEmail).toLowerCase().trim()
+        );
+        if (u) {
+          u.password = pwd;
+          saveLocalCache();
+
+          if (u.email) {
+            const rawAvatar = formatAvatarUrl(pwd, u.avatar || "");
+            safeRun(
+              supabase
+                .from("registrations")
+                .update({ avatar_url: rawAvatar })
+                .eq("email", u.email.toLowerCase().trim())
+            );
+          }
+        }
+        return { changes: 1 };
+      }
+
       // UPDATE users profile
       if (/UPDATE\s+users\s+SET\s+name\s*=\s*\?/i.test(cleanSql)) {
         const [name, branch, semester, roll_number, avatar, id] = cleanParams;
@@ -622,21 +679,22 @@ export async function getDatabase(): Promise<DatabaseAdapter> {
           if (avatar !== undefined) u.avatar = avatar;
           saveLocalCache();
 
-          // Sync to Supabase registrations table
+          // Sync to Supabase registrations table while preserving password hash in avatar_url
           if (u.email) {
-            supabase
-              .from("registrations")
-              .update({
-                name: u.name,
-                branch: u.branch,
-                semester: u.semester,
-                roll_number: u.roll_number,
-                avatar_url: u.avatar || "",
-                updated_at: new Date().toISOString(),
-              })
-              .eq("email", u.email.toLowerCase().trim())
-              .then(() => {})
-              .catch(() => {});
+            const rawAvatar = formatAvatarUrl(u.password || "", u.avatar || "");
+            safeRun(
+              supabase
+                .from("registrations")
+                .update({
+                  name: u.name,
+                  branch: u.branch,
+                  semester: u.semester,
+                  roll_number: u.roll_number,
+                  avatar_url: rawAvatar,
+                  updated_at: new Date().toISOString(),
+                })
+                .eq("email", u.email.toLowerCase().trim())
+            );
           }
         }
         return { changes: 1 };
@@ -675,21 +733,36 @@ export async function getDatabase(): Promise<DatabaseAdapter> {
       }
 
       // DELETE FROM users
-      if (/DELETE\s+FROM\s+users\s+WHERE\s+id\s*=\s*\?/i.test(cleanSql)) {
-        const uId = cleanParams[0];
-        const target = (tables.users || []).find((u) => u.id === uId || String(u.id) === String(uId));
-        tables.users = (tables.users || []).filter((u) => u.id !== uId && String(u.id) !== String(uId));
-        saveLocalCache();
-
-        if (target?.email) {
-          supabase
-            .from("registrations")
-            .delete()
-            .eq("email", target.email.toLowerCase().trim())
-            .then(() => {})
-            .catch(() => {});
+      if (/DELETE\s+FROM\s+users/i.test(cleanSql)) {
+        if (/WHERE\s+email\s*=\s*\?/i.test(cleanSql)) {
+          const emailVal = String(cleanParams[0]).toLowerCase().trim();
+          tables.users = (tables.users || []).filter((u) => u.email?.toLowerCase().trim() !== emailVal);
+          saveLocalCache();
+          safeRun(
+            supabase
+              .from("registrations")
+              .delete()
+              .eq("email", emailVal)
+          );
+          return { changes: 1 };
         }
-        return { changes: 1 };
+
+        if (/WHERE\s+id\s*=\s*\?/i.test(cleanSql)) {
+          const uId = cleanParams[0];
+          const target = (tables.users || []).find((u) => u.id === uId || String(u.id) === String(uId));
+          tables.users = (tables.users || []).filter((u) => u.id !== uId && String(u.id) !== String(uId));
+          saveLocalCache();
+
+          if (target?.email) {
+            safeRun(
+              supabase
+                .from("registrations")
+                .delete()
+                .eq("email", target.email.toLowerCase().trim())
+            );
+          }
+          return { changes: 1 };
+        }
       }
 
       return { changes: 1 };

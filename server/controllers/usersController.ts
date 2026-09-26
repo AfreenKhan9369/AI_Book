@@ -5,6 +5,7 @@ import {
   testSupabaseConnection,
   storeRegistrationInSupabase,
   getSupabase,
+  parseAvatarUrl,
   SUPABASE_PROJECT_ID,
   SUPABASE_URL,
 } from "../config/supabase.js";
@@ -106,7 +107,11 @@ export async function getSupabaseRegistrations(req: AuthRequest, res: Response):
         .order("created_at", { ascending: false });
 
       if (!supaError && supaUsers && supaUsers.length > 0) {
-        res.json(supaUsers);
+        const sanitized = supaUsers.map((u: any) => ({
+          ...u,
+          avatar_url: parseAvatarUrl(u.avatar_url || "").avatarUrl,
+        }));
+        res.json(sanitized);
         return;
       }
     } catch (e: any) {
@@ -116,13 +121,18 @@ export async function getSupabaseRegistrations(req: AuthRequest, res: Response):
     // Fallback to local users list if Supabase table is empty or error
     const db = await getDatabase();
     const users = await db.query(`
-      SELECT id, name, email, role, branch, semester, roll_number, 
+      SELECT id, name, email, role, branch, semester, roll_number, avatar,
              supabase_user_id, supabase_synced, supabase_synced_at, created_at
       FROM users
       ORDER BY id DESC;
     `);
 
-    res.json(users);
+    const sanitizedUsers = (users || []).map((u: any) => ({
+      ...u,
+      avatar_url: parseAvatarUrl(u.avatar || "").avatarUrl,
+    }));
+
+    res.json(sanitizedUsers);
   } catch (error: any) {
     console.error("[Users] getSupabaseRegistrations error:", error);
     res.status(500).json({ message: "Failed to fetch registrations." });
@@ -183,9 +193,13 @@ export async function deleteUser(req: AuthRequest, res: Response): Promise<void>
     }
 
     const db = await getDatabase();
+    const target = await db.getOne("SELECT id, email FROM users WHERE id = ?;", [id]);
     await db.execute("DELETE FROM bookmarks WHERE user_id = ?;", [id]);
     await db.execute("DELETE FROM quiz_history WHERE user_id = ?;", [id]);
     await db.execute("DELETE FROM users WHERE id = ?;", [id]);
+    if (target?.email) {
+      await db.execute("DELETE FROM users WHERE email = ?;", [target.email]);
+    }
 
     res.json({ message: "User deleted successfully." });
   } catch (error: any) {
