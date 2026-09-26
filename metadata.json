@@ -1,0 +1,6 @@
+{
+  "name": "AI_Book – AI-Powered College Notes Sharing System",
+  "description": "Comprehensive college notes and PYQ sharing platform with semester/subject filtering, PDF viewing, and AI-powered note summarization, Q&A, and quiz generation.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
