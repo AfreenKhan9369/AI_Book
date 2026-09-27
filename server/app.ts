@@ -39,6 +39,17 @@ export function createExpressApp(): Express {
   app.use(express.json({ limit: "15mb" }));
   app.use(express.urlencoded({ extended: true, limit: "15mb" }));
 
+  // Set framing and CORS headers so PDF iframes never fail with "refused to connect"
+  app.use((_req: Request, res: Response, next: NextFunction) => {
+    res.removeHeader("X-Frame-Options");
+    res.setHeader("X-Frame-Options", "SAMEORIGIN");
+    res.setHeader("Content-Security-Policy", "frame-ancestors 'self' *");
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    next();
+  });
+
   // Handle Netlify function path prefix rewriting so routes work seamlessly
   app.use((req: Request, _res: Response, next: NextFunction) => {
     if (req.url.startsWith("/.netlify/functions/api")) {

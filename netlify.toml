@@ -10,7 +10,7 @@
 
 [functions]
   node_bundler = "esbuild"
-  included_files = ["uploads/**"]
+  included_files = ["uploads/**", "public/uploads/**", "data/**"]
 
 # Redirect API calls to the serverless function
 [[redirects]]
@@ -18,7 +18,7 @@
   to = "/.netlify/functions/api/:splat"
   status = 200
 
-# Redirect upload downloads to the serverless function handler
+# Redirect upload downloads to the serverless function handler if not found statically
 [[redirects]]
   from = "/uploads/*"
   to = "/.netlify/functions/api/uploads/:splat"
@@ -31,9 +31,18 @@
   status = 200
 
 [[headers]]
+  for = "/uploads/*"
+  [headers.values]
+    X-Frame-Options = "SAMEORIGIN"
+    Content-Type = "application/pdf"
+    Access-Control-Allow-Origin = "*"
+    Content-Security-Policy = "frame-ancestors 'self' *"
+
+[[headers]]
   for = "/*"
   [headers.values]
-    X-Frame-Options = "DENY"
+    X-Frame-Options = "SAMEORIGIN"
     X-XSS-Protection = "1; mode=block"
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
+    Content-Security-Policy = "frame-ancestors 'self' *"

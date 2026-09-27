@@ -7,13 +7,13 @@ import {
   BookOpen,
   HelpCircle,
   FileText,
-  RotateCw,
   ZoomIn,
   ZoomOut,
-  Maximize2,
-  Check,
   Send,
   Loader2,
+  CheckCircle2,
+  Layers,
+  GraduationCap,
 } from "lucide-react";
 import { Material } from "../types";
 import { api } from "../services/api";
@@ -31,6 +31,7 @@ export function PdfViewerModal({ material, onClose, onDownload, onTriggerQuiz }:
   const [aiPanelOpen, setAiPanelOpen] = useState(true);
   const [activeTab, setActiveTab] = useState<"summary" | "ask">("summary");
   const [zoomLevel, setZoomLevel] = useState<number>(100);
+  const [docViewMode, setDocViewMode] = useState<"pdf" | "outline">("pdf");
 
   // AI Summary state
   const [summary, setSummary] = useState<string>("");
@@ -93,7 +94,7 @@ export function PdfViewerModal({ material, onClose, onDownload, onTriggerQuiz }:
     <div className="fixed inset-0 z-50 overflow-hidden bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-200">
       <div className="relative w-full h-[95vh] max-w-7xl bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-slate-700/20">
         {/* Modal Top Bar */}
-        <div className="px-5 py-3.5 bg-slate-900 text-white flex items-center justify-between gap-4 border-b border-slate-800">
+        <div className="px-4 sm:px-6 py-3.5 bg-slate-900 text-white flex items-center justify-between gap-4 border-b border-slate-800">
           <div className="flex items-center gap-3 overflow-hidden">
             <div className="p-2 rounded-xl bg-indigo-600/30 text-indigo-400 border border-indigo-500/30 flex-shrink-0">
               <FileText className="w-5 h-5" />
@@ -118,7 +119,19 @@ export function PdfViewerModal({ material, onClose, onDownload, onTriggerQuiz }:
           </div>
 
           {/* Right Action buttons */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {/* Open Raw in New Tab */}
+            <a
+              href={material.file_path}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600/80 hover:bg-indigo-600 text-white transition-colors shadow-sm"
+              title="Open raw PDF in a new browser tab"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Open in Tab</span>
+            </a>
+
             {/* AI Copilot toggle */}
             <button
               id="btn-pdf-toggle-ai"
@@ -130,29 +143,18 @@ export function PdfViewerModal({ material, onClose, onDownload, onTriggerQuiz }:
               }`}
             >
               <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-              <span>{aiPanelOpen ? "Hide AI Copilot" : "AI Copilot"}</span>
+              <span className="hidden sm:inline">{aiPanelOpen ? "Hide AI Copilot" : "AI Copilot"}</span>
             </button>
 
             {/* Download button */}
             <button
               id="btn-pdf-modal-download"
               onClick={() => onDownload(material)}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors"
             >
               <Download className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Download</span>
             </button>
-
-            {/* Direct Open in new tab */}
-            <a
-              href={material.file_path}
-              target="_blank"
-              rel="noreferrer"
-              className="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
-              title="Open raw file in new tab"
-            >
-              <ExternalLink className="w-4 h-4" />
-            </a>
 
             {/* Close */}
             <button
@@ -167,57 +169,214 @@ export function PdfViewerModal({ material, onClose, onDownload, onTriggerQuiz }:
 
         {/* Content Area: Viewer + AI Drawer */}
         <div className="flex-1 flex overflow-hidden bg-slate-100">
-          {/* PDF Viewer Frame */}
+          {/* Main Document Panel */}
           <div className="flex-1 flex flex-col h-full overflow-hidden">
-            {/* Viewer Zoom & Scale Controls */}
-            <div className="px-4 py-2 bg-slate-200/70 border-b border-slate-300/80 flex items-center justify-between text-xs text-slate-700">
-              <div className="flex items-center gap-3">
-                <span className="font-semibold text-slate-600">Viewing PDF Document</span>
-                <span className="px-2 py-0.5 rounded bg-white font-mono text-[11px] text-slate-600 border border-slate-300">
+            {/* Viewer Control & View Switcher Bar */}
+            <div className="px-4 py-2 bg-slate-200/80 border-b border-slate-300/80 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-700">
+              <div className="flex items-center gap-2">
+                <div className="inline-flex rounded-lg bg-slate-300/60 p-0.5 border border-slate-300">
+                  <button
+                    onClick={() => setDocViewMode("pdf")}
+                    className={`px-3 py-1 rounded-md text-xs font-bold transition-all ${
+                      docViewMode === "pdf"
+                        ? "bg-white text-indigo-700 shadow-2xs"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    PDF Document
+                  </button>
+                  <button
+                    onClick={() => setDocViewMode("outline")}
+                    className={`px-3 py-1 rounded-md text-xs font-bold transition-all ${
+                      docViewMode === "outline"
+                        ? "bg-white text-indigo-700 shadow-2xs"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    Structured Notes
+                  </button>
+                </div>
+                <span className="hidden md:inline font-mono text-[11px] text-slate-500">
                   {material.file_name}
                 </span>
               </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setZoomLevel((z) => Math.max(z - 15, 60))}
-                  className="p-1 rounded bg-white hover:bg-slate-50 border border-slate-300"
-                  title="Zoom Out"
-                >
-                  <ZoomOut className="w-3.5 h-3.5 text-slate-600" />
-                </button>
-                <span className="font-mono text-xs w-12 text-center">{zoomLevel}%</span>
-                <button
-                  onClick={() => setZoomLevel((z) => Math.min(z + 15, 160))}
-                  className="p-1 rounded bg-white hover:bg-slate-50 border border-slate-300"
-                  title="Zoom In"
-                >
-                  <ZoomIn className="w-3.5 h-3.5 text-slate-600" />
-                </button>
-                <button
-                  onClick={() => setZoomLevel(100)}
-                  className="px-2 py-1 rounded bg-white hover:bg-slate-50 border border-slate-300 text-[11px]"
-                >
-                  Reset
-                </button>
-              </div>
+
+              {docViewMode === "pdf" ? (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setZoomLevel((z) => Math.max(z - 15, 60))}
+                    className="p-1 rounded bg-white hover:bg-slate-50 border border-slate-300"
+                    title="Zoom Out"
+                  >
+                    <ZoomOut className="w-3.5 h-3.5 text-slate-600" />
+                  </button>
+                  <span className="font-mono text-xs w-10 text-center">{zoomLevel}%</span>
+                  <button
+                    onClick={() => setZoomLevel((z) => Math.min(z + 15, 160))}
+                    className="p-1 rounded bg-white hover:bg-slate-50 border border-slate-300"
+                    title="Zoom In"
+                  >
+                    <ZoomIn className="w-3.5 h-3.5 text-slate-600" />
+                  </button>
+                  <button
+                    onClick={() => setZoomLevel(100)}
+                    className="px-2 py-1 rounded bg-white hover:bg-slate-50 border border-slate-300 text-[11px]"
+                  >
+                    Reset
+                  </button>
+                </div>
+              ) : (
+                <span className="text-[11px] font-medium text-slate-500">
+                  Interactive syllabus reading view
+                </span>
+              )}
             </div>
 
-            {/* PDF Embedded Container */}
-            <div className="flex-1 overflow-auto p-4 flex justify-center bg-slate-800/90">
-              <div
-                className="w-full h-full bg-white shadow-xl rounded-lg overflow-hidden transition-all flex flex-col"
-                style={{
-                  maxWidth: `${zoomLevel}%`,
-                  minHeight: "100%",
-                }}
+            {/* Quick helper tip banner */}
+            <div className="px-4 py-1.5 bg-amber-50 border-b border-amber-200/80 flex items-center justify-between text-[11px] text-amber-900">
+              <span className="truncate">
+                💡 Tip: If your browser blocks embedded document preview, use the{" "}
+                <strong>Open in Tab</strong> or <strong>Download</strong> buttons above.
+              </span>
+              <a
+                href={material.file_path}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-bold underline text-indigo-700 hover:text-indigo-900 flex-shrink-0 ml-2"
               >
-                <iframe
-                  src={`${material.file_path}#toolbar=1&navpanes=0`}
-                  title={material.title}
-                  className="w-full h-full border-0 flex-1 min-h-[500px]"
-                />
-              </div>
+                Direct Link
+              </a>
             </div>
+
+            {/* Viewer Content Area */}
+            {docViewMode === "pdf" ? (
+              <div className="flex-1 overflow-auto p-4 flex justify-center bg-slate-800/90">
+                <div
+                  className="w-full h-full bg-white shadow-xl rounded-lg overflow-hidden transition-all flex flex-col"
+                  style={{
+                    maxWidth: `${zoomLevel}%`,
+                    minHeight: "100%",
+                  }}
+                >
+                  <object
+                    data={`${material.file_path}#toolbar=1&navpanes=0`}
+                    type="application/pdf"
+                    className="w-full h-full flex-1 min-h-[500px]"
+                  >
+                    <iframe
+                      src={`${material.file_path}#toolbar=1&navpanes=0`}
+                      title={material.title}
+                      className="w-full h-full border-0 flex-1 min-h-[500px]"
+                    >
+                      <div className="p-8 text-center bg-slate-50 h-full flex flex-col items-center justify-center gap-3">
+                        <FileText className="w-12 h-12 text-slate-400" />
+                        <h4 className="text-sm font-bold text-slate-700">PDF Document Ready</h4>
+                        <p className="text-xs text-slate-500 max-w-sm">
+                          Your browser cannot display embedded PDFs directly inside this window.
+                        </p>
+                        <a
+                          href={material.file_path}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow"
+                        >
+                          Open PDF in New Browser Tab
+                        </a>
+                      </div>
+                    </iframe>
+                  </object>
+                </div>
+              </div>
+            ) : (
+              /* Structured Notes & Syllabus View */
+              <div className="flex-1 overflow-y-auto p-6 bg-slate-50 space-y-6">
+                <div className="max-w-3xl mx-auto space-y-6">
+                  {/* Note Header Card */}
+                  <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+                    <div className="flex items-center gap-2 text-indigo-600">
+                      <GraduationCap className="w-5 h-5" />
+                      <span className="text-xs font-bold uppercase tracking-wider">
+                        {material.subject_name} ({material.subject_code})
+                      </span>
+                    </div>
+                    <h2 className="text-xl font-extrabold text-slate-900">{material.title}</h2>
+                    <div className="flex flex-wrap items-center gap-2 pt-1 text-xs">
+                      <span className="px-2.5 py-1 rounded-md bg-indigo-50 font-bold text-indigo-700 border border-indigo-100">
+                        {material.module_unit}
+                      </span>
+                      <span className="px-2.5 py-1 rounded-md bg-slate-100 font-medium text-slate-700">
+                        Semester {material.semester}
+                      </span>
+                      <span className="px-2.5 py-1 rounded-md bg-slate-100 font-medium text-slate-700">
+                        {material.academic_year}
+                      </span>
+                      <span className="px-2.5 py-1 rounded-md bg-emerald-50 font-semibold text-emerald-800 border border-emerald-100">
+                        Verified Resource
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Summary / Description */}
+                  <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+                    <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                      <BookOpen className="w-4 h-4 text-indigo-600" />
+                      <span>Executive Overview & Lecture Abstract</span>
+                    </h3>
+                    <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                      {material.description}
+                    </p>
+                  </div>
+
+                  {/* Study Recommendations */}
+                  <div className="bg-gradient-to-br from-indigo-50 to-sky-50 p-6 rounded-2xl border border-indigo-100 space-y-3">
+                    <h3 className="text-sm font-bold text-indigo-950 flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-amber-500" />
+                      <span>How to Master this Module for Exams</span>
+                    </h3>
+                    <ul className="space-y-2 text-xs text-indigo-900">
+                      <li className="flex items-start gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-indigo-600 flex-shrink-0 mt-0.5" />
+                        <span>
+                          Review the core invariants, formula definitions, and step-by-step algorithm walkthroughs.
+                        </span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-indigo-600 flex-shrink-0 mt-0.5" />
+                        <span>
+                          Click <strong>Instant Summary</strong> in the AI Copilot to generate high-yield revision flashcards.
+                        </span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-indigo-600 flex-shrink-0 mt-0.5" />
+                        <span>
+                          Use <strong>Take Quiz</strong> to assess multiple-choice mastery and pinpoint weak areas.
+                        </span>
+                      </li>
+                    </ul>
+                  </div>
+
+                  {/* Quick Action Footer */}
+                  <div className="flex items-center gap-3">
+                    <a
+                      href={material.file_path}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 py-3 px-4 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 text-center shadow transition-all flex items-center justify-center gap-2"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      <span>Open Full PDF Document</span>
+                    </a>
+                    <button
+                      onClick={() => onDownload(material)}
+                      className="py-3 px-5 rounded-xl text-xs font-bold text-slate-700 bg-white hover:bg-slate-100 border border-slate-300 shadow-2xs flex items-center gap-2 transition-all"
+                    >
+                      <Download className="w-4 h-4" />
+                      <span>Save PDF</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Collapsible AI Copilot Panel */}
