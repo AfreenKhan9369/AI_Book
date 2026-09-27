@@ -3,96 +3,358 @@
 << /Type /Catalog /Pages 2 0 R >>
 endobj
 2 0 obj
-<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+<< /Type /Pages /Kids [3 0 R 5 0 R 7 0 R 9 0 R] /Count 4 >>
 endobj
 3 0 obj
-<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >> /F2 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> >> >> >>
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 11 0 R /F2 12 0 R >> >> >>
 endobj
 4 0 obj
-<< /Length 2398 >>
+<< /Length 3450 >>
 stream
 BT
+/F1 18 Tf
 50 740 Td
-/F1 10 Tf
-(AI_BOOK • VERIFIED COLLEGE LECTURE NOTES REPOSITORY) Tj
-0 -14 Td
-/F2 9 Tf
-(2024-25 | Verified Faculty Notes | Semester Resource) Tj
-0 -10 Td
-/F2 9 Tf
-(------------------------------------------------------------------------------------------------------------------------) Tj
-0 -24 Td
-/F1 16 Tf
 (Transaction Processing, ACID Properties & Concurrency Control) Tj
+/F2 11 Tf
 0 -18 Td
-/F1 11 Tf
-(Subject: CS402  |  Unit 4: Transaction Management) Tj
-0 -12 Td
-/F2 9 Tf
+(Database Management Systems -- Detailed Notes) Tj
+0 -10 Td
 (------------------------------------------------------------------------------------------------------------------------) Tj
-0 -20 Td
-/F1 12 Tf
-(1. Executive Overview & Syllabus Scope) Tj
-0 -15 Td
-/F2 10 Tf
-(In-depth notes on ACID properties, Conflict Serializability, Precedence Graphs, Two-Phase Locking 2PL, Deadlock Detection, and WAL Recovery.) Tj
 0 -22 Td
-/F1 12 Tf
-(2. Key Architectural Invariants & Core Topics) Tj
-0 -18 Td
-/F1 11 Tf
-(• Lecture Modules & Key Topics) Tj
-0 -15 Td
-/F2 10 Tf
-(    - Unit 4: Transaction Processing & Concurrency Protocols) Tj
-0 -15 Td
-/F2 10 Tf
-(    - 1. ACID Properties: Atomicity, Consistency, Isolation, Durability breakdown) Tj
-0 -15 Td
-/F2 10 Tf
-(    - 2. Serializability: Conflict Serializability, View Serializability, and Precedence Graph testing) Tj
-0 -15 Td
-/F2 10 Tf
-(    - 3. Lock-Based Protocols: Shared S and Exclusive X locks; Two-Phase Locking 2PL) Tj
-0 -15 Td
-/F2 10 Tf
-(    - 4. Strict 2PL vs Rigorous 2PL: Cascading abort prevention and serializable schedules) Tj
-0 -15 Td
-/F2 10 Tf
-(    - 5. Deadlock Handling: Wait-Die vs Wound-Wait timestamp schemes and Wait-For Graphs) Tj
-0 -15 Td
-/F2 10 Tf
-(    - 6. Log-Based Recovery: Write-Ahead Logging WAL and ARIES recovery algorithm) Tj
-0 -22 Td
-/F1 12 Tf
-(3. University Exam Tips & High-Yield Checklist) Tj
+/F1 13 Tf
+(1. Introduction to Transaction Processing) Tj
 0 -16 Td
-/F2 10 Tf
-(  * Practice numerical problems and time complexity derivations under timed conditions.) Tj
-0 -15 Td
-/F2 10 Tf
-(  * Draw neat labeled block diagrams for full credit in subjective university evaluations.) Tj
-0 -15 Td
-/F2 10 Tf
-(  * Use AI_Book Quiz & Summary features to test active recall before mid-terms and finals.) Tj
+/F2 9.5 Tf
+(A transaction is a single logical unit of work that accesses and possibly modifies the contents of a database.) Tj
+0 -13 Td
+(It is a sequence of one or more operations (reads and writes) that must be executed as an atomic unit --) Tj
+0 -13 Td
+(either all operations complete successfully, or none of them take effect.) Tj
+0 -16 Td
+/F1 9.5 Tf
+(Example: ) Tj
+/F2 9.5 Tf
+(A bank transfer from Account A to Account B involves two operations: (1) Debit $1000 from Account A,) Tj
+0 -13 Td
+((2) Credit $1000 to Account B. Both operations together form a single transaction. If only one succeeds, the database) Tj
+0 -13 Td
+(becomes inconsistent.) Tj
 0 -18 Td
-/F2 9 Tf
-(------------------------------------------------------------------------------------------------------------------------) Tj
+/F1 11 Tf
+(Transaction States) Tj
 0 -14 Td
-/F1 9 Tf
-(AI_Book Digital Campus • Distributed under Academic Fair Use • Endorsed for Student Study) Tj
+/F2 9.5 Tf
+(A transaction moves through the following states during its execution:) Tj
+0 -14 Td
+(1  Active - The initial state; the transaction is executing.) Tj
+0 -13 Td
+(2  Partially Committed - After the final statement has executed, but before commit.) Tj
+0 -13 Td
+(3  Committed - After successful completion; changes are permanently saved.) Tj
+0 -13 Td
+(4  Failed - When normal execution can no longer proceed (due to a hardware/logical error).) Tj
+0 -13 Td
+(5  Aborted - After the transaction has been rolled back and the database restored to its prior state.) Tj
+0 -13 Td
+(6  Terminated - The transaction leaves the system (after commit or abort).) Tj
+0 -16 Td
+/F1 9.5 Tf
+(State flow (conceptual):) Tj
+0 -13 Td
+/F2 9 Tf
+(Active -> Partially Committed -> Committed -> Terminated) Tj
+0 -12 Td
+(Active/Partially Committed -> Failed -> Aborted -> Terminated) Tj
+0 -16 Td
+/F1 11 Tf
+(Operations on a Transaction) Tj
+0 -14 Td
+/F2 9.5 Tf
+(* Read(X): Reads the value of data item X from the database into a buffer.) Tj
+0 -13 Td
+(* Write(X): Writes the value from the buffer back into the database.) Tj
+0 -13 Td
+(* Commit: Signals successful completion; changes become permanent.) Tj
+0 -13 Td
+(* Rollback/Abort: Undoes all changes made by the transaction.) Tj
+0 -18 Td
+/F1 13 Tf
+(2. ACID Properties) Tj
+0 -15 Td
+/F2 9.5 Tf
+(For a transaction to maintain database consistency and reliability, it must satisfy four key properties: ACID.) Tj
+0 -15 Td
+/F1 10 Tf
+(A - Atomicity: ) Tj
+/F2 9.5 Tf
+("All or nothing" principle. A transaction is treated as a single, indivisible unit -- either all its operations) Tj
+0 -13 Td
+(are executed, or none are. Managed using transaction logs and rollback mechanisms.) Tj
+0 -15 Td
+/F1 10 Tf
+(C - Consistency: ) Tj
+/F2 9.5 Tf
+(A transaction must take the database from one valid (consistent) state to another valid state,) Tj
+0 -13 Td
+(preserving all integrity constraints (primary keys, foreign keys, triggers).) Tj
+0 -15 Td
+/F1 10 Tf
+(I - Isolation: ) Tj
+/F2 9.5 Tf
+(Multiple transactions executing concurrently should not interfere with one another. The intermediate) Tj
+0 -13 Td
+(state of a transaction should not be visible until commit (achieved via locking and scheduling).) Tj
+0 -15 Td
+/F1 10 Tf
+(D - Durability: ) Tj
+/F2 9.5 Tf
+(Once committed, changes must persist permanently, even during crashes or power failure (WAL logging).) Tj
 ET
 endstream
 endobj
+5 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 6 0 R /Resources << /Font << /F1 11 0 R /F2 12 0 R >> >> >>
+endobj
+6 0 obj
+<< /Length 3434 >>
+stream
+BT
+/F1 13 Tf
+50 740 Td
+(ACID Summary Table & Concurrent Execution Problems) Tj
+0 -10 Td
+/F2 9 Tf
+(------------------------------------------------------------------------------------------------------------------------) Tj
+0 -18 Td
+/F1 10 Tf
+(Property         | Ensures                             | Mechanism Used) Tj
+0 -12 Td
+/F2 9 Tf
+(------------------------------------------------------------------------------------------------------------------------) Tj
+0 -14 Td
+(Atomicity        | All-or-nothing execution            | Logging, rollback) Tj
+0 -13 Td
+(Consistency      | Valid state transitions             | Constraints, triggers) Tj
+0 -13 Td
+(Isolation        | No interference between transactions| Locking, scheduling) Tj
+0 -13 Td
+(Durability       | Permanence after commit             | Write-Ahead Logging (WAL), checkpoints) Tj
+0 -14 Td
+(------------------------------------------------------------------------------------------------------------------------) Tj
+0 -22 Td
+/F1 13 Tf
+(3. Concurrent Execution & Its Problems) Tj
+0 -15 Td
+/F2 9.5 Tf
+(Multiple transactions running simultaneously improve system throughput and resource utilization, but if not) Tj
+0 -13 Td
+(controlled properly, they lead to data inconsistency. Common concurrency anomalies include:) Tj
+0 -16 Td
+/F1 10 Tf
+(a) Lost Update Problem:) Tj
+0 -13 Td
+/F2 9.5 Tf
+(Two transactions read the same data item and update it, and one update overwrites the other, causing the first to be lost.) Tj
+0 -15 Td
+/F1 10 Tf
+(b) Dirty Read Problem (Temporary Inconsistency):) Tj
+0 -13 Td
+/F2 9.5 Tf
+(A transaction reads data that has been modified by another transaction that has not yet committed. If T2 aborts, T1 read invalid data.) Tj
+0 -15 Td
+/F1 10 Tf
+(c) Unrepeatable Read Problem:) Tj
+0 -13 Td
+/F2 9.5 Tf
+(A transaction reads the same data item twice and gets different values because another transaction modified and committed changes.) Tj
+0 -15 Td
+/F1 10 Tf
+(d) Phantom Read Problem:) Tj
+0 -13 Td
+/F2 9.5 Tf
+(A transaction re-executes a query returning a set of rows and finds that the set has changed (rows inserted/deleted by T2).) Tj
+0 -22 Td
+/F1 13 Tf
+(4. Schedules & Serializability) Tj
+0 -15 Td
+/F2 9.5 Tf
+(A schedule is the chronological order in which the operations of multiple transactions are executed.) Tj
+0 -15 Td
+/F1 10 Tf
+(Types of Schedules:) Tj
+0 -13 Td
+/F2 9.5 Tf
+(1  Serial Schedule: Transactions execute one after another with no overlapping -- always consistent, but inefficient.) Tj
+0 -13 Td
+(2  Concurrent (Non-serial) Schedule: Operations of multiple transactions are interleaved -- improves performance.) Tj
+0 -13 Td
+(3  Serializable Schedule: A concurrent schedule that produces the same result as some serial execution.) Tj
+0 -16 Td
+/F1 10 Tf
+(Serializability & Recoverability:) Tj
+0 -13 Td
+/F2 9.5 Tf
+(* Conflict Serializability: Can be transformed into a serial schedule by swapping non-conflicting operations.) Tj
+0 -13 Td
+(* View Serializability: Schedule is view-equivalent to some serial schedule (same reads, same final writes).) Tj
+0 -13 Td
+(* Recoverable Schedule: A transaction commits only after all transactions from which it has read have committed.) Tj
+0 -13 Td
+(* Cascadeless Schedule: A transaction reads only values written by committed transactions -- avoids cascading aborts.) Tj
+0 -13 Td
+(* Strict Schedule: A transaction neither reads nor writes data until the last writer commits -- safest form.) Tj
+ET
+endstream
+endobj
+7 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 8 0 R /Resources << /Font << /F1 11 0 R /F2 12 0 R >> >> >>
+endobj
+8 0 obj
+<< /Length 2678 >>
+stream
+BT
+/F1 13 Tf
+50 740 Td
+(5. Concurrency Control Protocols & 6. Deadlocks) Tj
+0 -10 Td
+/F2 9 Tf
+(------------------------------------------------------------------------------------------------------------------------) Tj
+0 -16 Td
+/F2 9.5 Tf
+(Concurrency control ensures concurrent transaction execution leads to a consistent, serializable database state.) Tj
+0 -18 Td
+/F1 11 Tf
+(5.1 Lock-Based Protocols) Tj
+0 -14 Td
+/F2 9.5 Tf
+(* Shared Lock (S): Allows a transaction to read a data item; multiple transactions can hold S locks simultaneously.) Tj
+0 -13 Td
+(* Exclusive Lock (X): Allows both read and write; only one transaction can hold X lock at a time.) Tj
+0 -15 Td
+/F1 10 Tf
+(Two-Phase Locking (2PL) Protocol:) Tj
+0 -13 Td
+/F2 9.5 Tf
+(1  Growing Phase: The transaction may acquire locks but cannot release any.) Tj
+0 -13 Td
+(2  Shrinking Phase: The transaction may release locks but cannot acquire any new ones.) Tj
+0 -13 Td
+(Variants: Strict 2PL (holds exclusive locks until commit/abort); Rigorous 2PL (holds all locks until commit).) Tj
+0 -18 Td
+/F1 11 Tf
+(5.2 Timestamp-Based Protocols) Tj
+0 -13 Td
+/F2 9.5 Tf
+(Each transaction is assigned a unique timestamp TS(Ti) upon arrival. Conflicts are resolved ensuring transactions) Tj
+0 -13 Td
+(are ordered as if executed serially by timestamp order. Thomas' Write Rule allows out-of-order obsolete writes to be skipped.) Tj
+0 -18 Td
+/F1 11 Tf
+(5.3 Validation (Optimistic) Concurrency Control) Tj
+0 -13 Td
+/F2 9.5 Tf
+(Assumes conflicts are rare. Executes in three phases: (1) Read Phase (updates local copy), (2) Validation Phase) Tj
+0 -13 Td
+((checks serializability violations), (3) Write Phase (commits changes to database). Best for low-conflict workloads.) Tj
+0 -18 Td
+/F1 11 Tf
+(5.4 Multiple Granularity Locking) Tj
+0 -13 Td
+/F2 9.5 Tf
+(Locks at different hierarchy levels (database -> table -> page -> row) using intention locks (IS, IX) to optimize lock overhead.) Tj
+0 -22 Td
+/F1 13 Tf
+(6. Deadlocks) Tj
+0 -15 Td
+/F2 9.5 Tf
+(A deadlock occurs when two or more transactions are waiting indefinitely for one another to release locks,) Tj
+0 -13 Td
+(forming a cycle of dependencies (e.g., T1 holds A, waits for B; T2 holds B, waits for A).) Tj
+0 -16 Td
+/F1 10 Tf
+(Deadlock Handling Approaches:) Tj
+0 -14 Td
+/F2 9.5 Tf
+(1  Deadlock Prevention: Wait-Die scheme (older waits, younger dies) or Wound-Wait scheme (older wounds/aborts younger).) Tj
+0 -13 Td
+(2  Deadlock Detection: System constructs a Wait-For Graph (WFG); if a cycle is detected, a victim transaction is rolled back.) Tj
+0 -13 Td
+(3  Deadlock Avoidance: Uses timestamp ordering or resource allocation graphs to ensure safe states before granting locks.) Tj
+ET
+endstream
+endobj
+9 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 10 0 R /Resources << /Font << /F1 11 0 R /F2 12 0 R >> >> >>
+endobj
+10 0 obj
+<< /Length 1677 >>
+stream
+BT
+/F1 14 Tf
+50 740 Td
+(7. Summary & Conceptual Synthesis) Tj
+0 -10 Td
+/F2 9 Tf
+(------------------------------------------------------------------------------------------------------------------------) Tj
+0 -18 Td
+/F1 10 Tf
+(Concept             | Key Idea) Tj
+0 -12 Td
+/F2 9 Tf
+(------------------------------------------------------------------------------------------------------------------------) Tj
+0 -15 Td
+(Transaction         | Logical unit of work; sequence of atomic read/write operations) Tj
+0 -14 Td
+(ACID                | Atomicity, Consistency, Isolation, Durability -- guarantees reliable transactions) Tj
+0 -14 Td
+(Schedule            | Chronological order of execution of concurrent transaction operations) Tj
+0 -14 Td
+(Serializability     | Concurrent schedule equivalent to some serial schedule) Tj
+0 -14 Td
+(Concurrency Control | Locking, timestamping, validation to maintain consistency during concurrent execution) Tj
+0 -14 Td
+(Deadlock            | Circular wait among transactions; handled via prevention, detection, or avoidance) Tj
+0 -15 Td
+(------------------------------------------------------------------------------------------------------------------------) Tj
+0 -25 Td
+/F1 12 Tf
+(Why it matters:) Tj
+0 -16 Td
+/F2 10 Tf
+(Transaction processing and concurrency control together allow modern DBMSs to support multiple users simultaneously) Tj
+0 -14 Td
+(without sacrificing data correctness -- this is the backbone of reliable systems like banking applications,) Tj
+0 -14 Td
+(airline reservations, and e-commerce platforms worldwide.) Tj
+0 -35 Td
+/F1 10 Tf
+(AI_Book Digital Campus Notes Repository -- Verified Database Systems Lecture Notes) Tj
+ET
+endstream
+endobj
+11 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+endobj
+12 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
 xref
-0 5
+0 13
 0000000000 65535 f 
 0000000009 00000 n 
 0000000058 00000 n 
-0000000115 00000 n 
-0000000354 00000 n 
+0000000133 00000 n 
+0000000271 00000 n 
+0000003773 00000 n 
+0000003911 00000 n 
+0000007397 00000 n 
+0000007535 00000 n 
+0000010265 00000 n 
+0000010404 00000 n 
+0000012134 00000 n 
+0000012210 00000 n 
 trailer
-<< /Size 5 /Root 1 0 R >>
+<< /Size 13 /Root 1 0 R >>
 startxref
-2804
+12281
 %%EOF
