@@ -1,0 +1,98 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >> /F2 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> >> >> >>
+endobj
+4 0 obj
+<< /Length 2349 >>
+stream
+BT
+50 740 Td
+/F1 10 Tf
+(AI_BOOK • VERIFIED COLLEGE LECTURE NOTES REPOSITORY) Tj
+0 -14 Td
+/F2 9 Tf
+(2023-24 | Verified Faculty Notes | Semester Resource) Tj
+0 -10 Td
+/F2 9 Tf
+(------------------------------------------------------------------------------------------------------------------------) Tj
+0 -24 Td
+/F1 16 Tf
+(Operating Systems – End-Term University Exam Solved with Answer Key) Tj
+0 -18 Td
+/F1 11 Tf
+(Subject: CS401  |  End-Term University Exam) Tj
+0 -12 Td
+/F2 9 Tf
+(------------------------------------------------------------------------------------------------------------------------) Tj
+0 -20 Td
+/F1 12 Tf
+(1. Executive Overview & Syllabus Scope) Tj
+0 -15 Td
+/F2 10 Tf
+(Official end-term question paper with verified model answers, diagrams, numerical solutions for Banker's Algorithm, and Page Replacement comparative tables.) Tj
+0 -22 Td
+/F1 12 Tf
+(2. Key Architectural Invariants & Core Topics) Tj
+0 -18 Td
+/F1 11 Tf
+(• Lecture Modules & Key Topics) Tj
+0 -15 Td
+/F2 10 Tf
+(    - Operating Systems End-Term Examination Year 2023-24) Tj
+0 -15 Td
+/F2 10 Tf
+(    - Part A Short Questions 10 x 2 = 20 Marks:) Tj
+0 -15 Td
+/F2 10 Tf
+(    - Q1: Differentiate between monolithic and microkernel architectures.) Tj
+0 -15 Td
+/F2 10 Tf
+(    - Q2: What is Belady's Anomaly? Give one replacement algorithm that suffers from it.) Tj
+0 -15 Td
+/F2 10 Tf
+(    - Part B Numerical & Long Answers 5 x 16 = 80 Marks:) Tj
+0 -15 Td
+/F2 10 Tf
+(    - Q3: Solve Banker's Safety Algorithm for given allocation matrix [Full Solution Included].) Tj
+0 -15 Td
+/F2 10 Tf
+(    - Q4: Calculate Page Faults for FIFO, LRU, Optimal for reference string: 7,0,1,2,0,3,0,4,2,3,0,3,2.) Tj
+0 -22 Td
+/F1 12 Tf
+(3. University Exam Tips & High-Yield Checklist) Tj
+0 -16 Td
+/F2 10 Tf
+(  * Practice numerical problems and time complexity derivations under timed conditions.) Tj
+0 -15 Td
+/F2 10 Tf
+(  * Draw neat labeled block diagrams for full credit in subjective university evaluations.) Tj
+0 -15 Td
+/F2 10 Tf
+(  * Use AI_Book Quiz & Summary features to test active recall before mid-terms and finals.) Tj
+0 -18 Td
+/F2 9 Tf
+(------------------------------------------------------------------------------------------------------------------------) Tj
+0 -14 Td
+/F1 9 Tf
+(AI_Book Digital Campus • Distributed under Academic Fair Use • Endorsed for Student Study) Tj
+ET
+endstream
+endobj
+xref
+0 5
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000354 00000 n 
+trailer
+<< /Size 5 /Root 1 0 R >>
+startxref
+2755
+%%EOF

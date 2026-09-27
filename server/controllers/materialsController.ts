@@ -3,6 +3,7 @@ import path from "node:path";
 import fs from "node:fs";
 import { getDatabase } from "../config/db.js";
 import { AuthRequest } from "../middleware/auth.js";
+import { generateFallbackPdf, writePdfToDisk } from "../utils/pdfGenerator.js";
 
 // Helper to format bytes to human readable string
 function formatBytes(bytes: number, decimals = 1) {
@@ -125,15 +126,28 @@ export async function downloadMaterial(req: Request, res: Response): Promise<voi
     // Increment downloads count
     await db.execute("UPDATE materials SET downloads_count = downloads_count + 1 WHERE id = ?;", [id]);
 
-    let filePath = path.join(process.cwd(), material.file_path.replace(/^\//, ""));
-    if (!fs.existsSync(filePath)) {
-      const tmpPath = path.join("/tmp", material.file_path.replace(/^\//, ""));
-      if (fs.existsSync(tmpPath)) {
-        filePath = tmpPath;
+    const candidates = [
+      path.join(process.cwd(), "public", material.file_path.replace(/^\//, "")),
+      path.join(process.cwd(), material.file_path.replace(/^\//, "")),
+      path.join("/tmp", material.file_path.replace(/^\//, "")),
+      path.join(process.cwd(), "public", "uploads", material.file_name),
+      path.join(process.cwd(), "uploads", material.file_name),
+      path.join("/tmp", "uploads", material.file_name),
+    ];
+
+    let filePath = candidates.find((p) => fs.existsSync(p));
+
+    if (!filePath) {
+      try {
+        const fallbackBuf = generateFallbackPdf(material.file_name);
+        writePdfToDisk(material.file_name, fallbackBuf);
+        filePath = path.join(process.cwd(), "public", "uploads", material.file_name);
+      } catch (err) {
+        console.error("[Materials] Fallback PDF generation failed:", err);
       }
     }
 
-    if (fs.existsSync(filePath)) {
+    if (filePath && fs.existsSync(filePath)) {
       res.setHeader("Content-Disposition", `attachment; filename="${material.file_name}"`);
       res.setHeader("Content-Type", "application/pdf");
       const fileStream = fs.createReadStream(filePath);

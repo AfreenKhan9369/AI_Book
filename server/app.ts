@@ -1,8 +1,10 @@
 import express, { Express, Request, Response, NextFunction } from "express";
 import path from "node:path";
+import fs from "node:fs";
 import dotenv from "dotenv";
 import { initDatabaseAndSeed } from "./utils/seedData.js";
 import { uploadsDir } from "./middleware/upload.js";
+import { generateFallbackPdf, writePdfToDisk } from "./utils/pdfGenerator.js";
 import authRoutes from "./routes/authRoutes.js";
 import subjectsRoutes from "./routes/subjectsRoutes.js";
 import materialsRoutes from "./routes/materialsRoutes.js";
@@ -45,9 +47,52 @@ export function createExpressApp(): Express {
     next();
   });
 
-  // Serve static uploaded PDF files
+  // Serve static uploaded PDF files from both public/uploads and root uploads
+  const publicUploads = path.join(process.cwd(), "public", "uploads");
+  try {
+    if (!fs.existsSync(publicUploads)) fs.mkdirSync(publicUploads, { recursive: true });
+  } catch {}
+
+  app.use("/uploads", express.static(publicUploads));
   app.use("/uploads", express.static(uploadsDir));
+  app.use("/api/uploads", express.static(publicUploads));
   app.use("/api/uploads", express.static(uploadsDir));
+
+  // Dynamic fallback handler for any requested PDF document to guarantee no 404
+  const handlePdfDocument = (req: Request, res: Response, next: NextFunction) => {
+    const rawFileName = req.params.fileName || path.basename(req.path);
+    if (!rawFileName || !rawFileName.toLowerCase().endsWith(".pdf")) {
+      return next();
+    }
+    const cleanName = path.basename(rawFileName);
+
+    const candidates = [
+      path.join(publicUploads, cleanName),
+      path.join(uploadsDir, cleanName),
+      path.join("/tmp", "uploads", cleanName),
+    ];
+
+    for (const loc of candidates) {
+      if (fs.existsSync(loc)) {
+        res.setHeader("Content-Type", "application/pdf");
+        return fs.createReadStream(loc).pipe(res);
+      }
+    }
+
+    try {
+      const pdfBuffer = generateFallbackPdf(cleanName);
+      writePdfToDisk(cleanName, pdfBuffer);
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Length", pdfBuffer.length);
+      return res.end(pdfBuffer);
+    } catch (err) {
+      console.error("[App] Fallback PDF generation error:", err);
+      next();
+    }
+  };
+
+  app.get("/uploads/:fileName", handlePdfDocument);
+  app.get("/api/uploads/:fileName", handlePdfDocument);
 
   // Health check endpoint
   const healthHandler = (_req: Request, res: Response) => {

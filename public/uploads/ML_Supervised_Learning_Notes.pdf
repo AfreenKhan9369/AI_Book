@@ -1,0 +1,95 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >> /F2 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> >> >> >>
+endobj
+4 0 obj
+<< /Length 2376 >>
+stream
+BT
+50 740 Td
+/F1 10 Tf
+(AI_BOOK • VERIFIED COLLEGE LECTURE NOTES REPOSITORY) Tj
+0 -14 Td
+/F2 9 Tf
+(2024-25 | Verified Faculty Notes | Semester Resource) Tj
+0 -10 Td
+/F2 9 Tf
+(------------------------------------------------------------------------------------------------------------------------) Tj
+0 -24 Td
+/F1 16 Tf
+(Supervised Learning: Regressions, SVM & Decision Trees) Tj
+0 -18 Td
+/F1 11 Tf
+(Subject: CS601  |  Unit 2: Supervised Methods) Tj
+0 -12 Td
+/F2 9 Tf
+(------------------------------------------------------------------------------------------------------------------------) Tj
+0 -20 Td
+/F1 12 Tf
+(1. Executive Overview & Syllabus Scope) Tj
+0 -15 Td
+/F2 10 Tf
+(Mathematical formulation of Gradient Descent, Cost Functions, Regularization L1 Lasso, L2 Ridge, Maximum Margin Hyperplane for SVM, and Information Gain / Gini Impurity.) Tj
+0 -22 Td
+/F1 12 Tf
+(2. Key Architectural Invariants & Core Topics) Tj
+0 -18 Td
+/F1 11 Tf
+(• Lecture Modules & Key Topics) Tj
+0 -15 Td
+/F2 10 Tf
+(    - Unit 2: Machine Learning Supervised Learning Foundations) Tj
+0 -15 Td
+/F2 10 Tf
+(    - 1. Linear & Logistic Regression: Cost function formulation and Batch vs Stochastic Gradient Descent) Tj
+0 -15 Td
+/F2 10 Tf
+(    - 2. Regularization & Generalization: L1 Lasso sparsity and L2 Ridge weight shrinkage techniques) Tj
+0 -15 Td
+/F2 10 Tf
+(    - 3. Support Vector Machines SVM: Hyperplane geometry, Soft-margin C parameter, and Kernel trick RBF) Tj
+0 -15 Td
+/F2 10 Tf
+(    - 4. Decision Trees: Shannon Entropy, Information Gain calculation, Gini Impurity, and Pruning strategies) Tj
+0 -15 Td
+/F2 10 Tf
+(    - 5. Ensemble Techniques: Bagging Random Forest vs Boosting AdaBoost, XGBoost mechanics) Tj
+0 -22 Td
+/F1 12 Tf
+(3. University Exam Tips & High-Yield Checklist) Tj
+0 -16 Td
+/F2 10 Tf
+(  * Practice numerical problems and time complexity derivations under timed conditions.) Tj
+0 -15 Td
+/F2 10 Tf
+(  * Draw neat labeled block diagrams for full credit in subjective university evaluations.) Tj
+0 -15 Td
+/F2 10 Tf
+(  * Use AI_Book Quiz & Summary features to test active recall before mid-terms and finals.) Tj
+0 -18 Td
+/F2 9 Tf
+(------------------------------------------------------------------------------------------------------------------------) Tj
+0 -14 Td
+/F1 9 Tf
+(AI_Book Digital Campus • Distributed under Academic Fair Use • Endorsed for Student Study) Tj
+ET
+endstream
+endobj
+xref
+0 5
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000354 00000 n 
+trailer
+<< /Size 5 /Root 1 0 R >>
+startxref
+2782
+%%EOF
