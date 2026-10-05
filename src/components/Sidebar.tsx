@@ -1,5 +1,5 @@
 import React from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   Layers,
   BookOpen,
@@ -30,14 +30,26 @@ export function Sidebar({
 }: SidebarProps) {
   const { user, isAuthenticated, isFaculty, logout } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
 
   const mainNavLinks = [
-    {
-      name: "Dashboard",
-      path: "/dashboard",
-      icon: Layers,
-      description: "Overview & syllabus stream",
-    },
+    ...(isFaculty
+      ? [
+          {
+            name: "Faculty Studio",
+            path: "/admin",
+            icon: ShieldCheck,
+            description: "Curriculum & notes manager",
+          },
+        ]
+      : [
+          {
+            name: "Dashboard",
+            path: "/dashboard",
+            icon: Layers,
+            description: "Overview & syllabus stream",
+          },
+        ]),
     {
       name: "Notes Catalog",
       path: "/notes",
@@ -63,17 +75,7 @@ export function Sidebar({
       : []),
   ];
 
-  const facultyNavLinks = isFaculty
-    ? [
-        {
-          name: "Faculty Studio",
-          path: "/admin",
-          icon: ShieldCheck,
-          adminOnly: true,
-          description: "Curriculum & notes manager",
-        },
-      ]
-    : [];
+  const facultyNavLinks: any[] = [];
 
   const handleLinkClick = () => {
     // Close sidebar on mobile when a link is clicked
@@ -102,7 +104,7 @@ export function Sidebar({
         {/* Brand & Close Button Header */}
         <div className="h-16 px-5 flex items-center justify-between border-b border-slate-100 flex-shrink-0">
           <Link
-            to="/dashboard"
+            to={isFaculty ? "/admin" : "/dashboard"}
             onClick={handleLinkClick}
             className="flex items-center gap-3 group"
           >
@@ -327,6 +329,7 @@ export function Sidebar({
                 <button
                   onClick={() => {
                     logout();
+                    navigate("/");
                   }}
                   className="inline-flex items-center gap-1 font-semibold text-rose-600 hover:text-rose-700 transition-colors"
                 >

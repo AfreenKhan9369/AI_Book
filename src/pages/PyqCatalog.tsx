@@ -3,10 +3,6 @@ import {
   FileText,
   Search,
   SlidersHorizontal,
-  Calendar,
-  Award,
-  Sparkles,
-  Layers,
 } from "lucide-react";
 import { Material, Subject } from "../types";
 import { MaterialCard } from "../components/MaterialCard";
@@ -65,8 +61,8 @@ export function PyqCatalog({ onViewPdf, onDownloadPdf, onOpenAi }: PyqCatalogPro
   return (
     <div className="space-y-6 pb-12">
       {/* Header */}
-      <div className="bg-gradient-to-r from-amber-950 via-slate-900 to-indigo-950 text-white p-6 sm:p-8 rounded-3xl border border-amber-900/40 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div className="space-y-2">
+      <div className="bg-gradient-to-r from-amber-950 via-slate-900 to-indigo-950 text-white p-6 sm:p-8 rounded-3xl border border-amber-900/40 shadow-xl">
+        <div className="space-y-2 max-w-3xl">
           <div className="flex items-center gap-2">
             <span className="p-2 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-400/30">
               <FileText className="w-5 h-5" />
@@ -78,18 +74,10 @@ export function PyqCatalog({ onViewPdf, onDownloadPdf, onOpenAi }: PyqCatalogPro
           <h1 className="text-2xl sm:text-3xl font-extrabold text-white">
             Previous Year Question Papers (PYQs)
           </h1>
-          <p className="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">
+          <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
             Practice real past semester mid-terms and university finals with verified faculty solutions. Spot recurring question patterns and master high-weightage topics.
           </p>
         </div>
-
-        <button
-          onClick={() => onOpenAi("quiz")}
-          className="self-start md:self-auto inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs shadow-lg shadow-amber-500/20 hover:scale-[1.02] transition-all"
-        >
-          <Sparkles className="w-4 h-4 text-slate-950" />
-          <span>Generate Mock Exam Test</span>
-        </button>
       </div>
 
       {/* Filter Toolbar */}
@@ -170,10 +158,18 @@ export function PyqCatalog({ onViewPdf, onDownloadPdf, onOpenAi }: PyqCatalogPro
       </div>
 
       {/* Grid of PYQs */}
-      {filtered.length === 0 ? (
+      {pyqs.length === 0 ? (
         <div className="p-12 text-center bg-white rounded-3xl border border-dashed border-slate-300">
           <FileText className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-          <h3 className="text-base font-bold text-slate-800 mb-1">No PYQ papers found</h3>
+          <h3 className="text-base font-bold text-slate-800 mb-1">No PYQs are available</h3>
+          <p className="text-xs text-slate-500 max-w-md mx-auto">
+            Previous year university question papers have not been published yet. Verified exam papers and solutions will appear here once uploaded by faculty.
+          </p>
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="p-12 text-center bg-white rounded-3xl border border-dashed border-slate-300">
+          <FileText className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+          <h3 className="text-base font-bold text-slate-800 mb-1">No PYQs match your filters</h3>
           <p className="text-xs text-slate-500 mb-4">
             Try adjusting your academic year, semester, or search term.
           </p>

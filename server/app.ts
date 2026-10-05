@@ -86,6 +86,7 @@ export function createExpressApp(): Express {
     for (const loc of candidates) {
       if (fs.existsSync(loc)) {
         res.setHeader("Content-Type", "application/pdf");
+        res.setHeader("Content-Disposition", `inline; filename="${cleanName}"`);
         return fs.createReadStream(loc).pipe(res);
       }
     }
@@ -94,6 +95,7 @@ export function createExpressApp(): Express {
       const pdfBuffer = generateFallbackPdf(cleanName);
       writePdfToDisk(cleanName, pdfBuffer);
       res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `inline; filename="${cleanName}"`);
       res.setHeader("Content-Length", pdfBuffer.length);
       return res.end(pdfBuffer);
     } catch (err) {

@@ -67,7 +67,7 @@ export function buildMultiPagePdf(pagesContent: string[]): Buffer {
   return Buffer.from(body + xref, "utf-8");
 }
 
-function escapePdf(text: string): string {
+function escapePdf(text?: string): string {
   return (text || "").replace(/[()\\]/g, "");
 }
 

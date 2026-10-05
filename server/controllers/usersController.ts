@@ -76,8 +76,6 @@ export async function getSupabaseStatus(req: AuthRequest, res: Response): Promis
 
     res.json({
       connected: testResult.connected,
-      projectId: SUPABASE_PROJECT_ID,
-      url: SUPABASE_URL,
       latencyMs: testResult.latencyMs,
       message: testResult.message,
       totalUsers: stats?.total || 0,
@@ -89,9 +87,7 @@ export async function getSupabaseStatus(req: AuthRequest, res: Response): Promis
     console.error("[Users] getSupabaseStatus error:", error);
     res.status(500).json({
       connected: false,
-      projectId: SUPABASE_PROJECT_ID,
-      url: SUPABASE_URL,
-      message: error.message || "Failed to query Supabase status",
+      message: error.message || "Failed to query database status",
     });
   }
 }

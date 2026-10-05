@@ -128,7 +128,13 @@ export async function getDatabase(): Promise<DatabaseAdapter> {
       tables.subjects = subRes.value.data;
     }
     if (matRes.status === "fulfilled" && matRes.value.data && matRes.value.data.length > 0) {
-      tables.materials = matRes.value.data;
+      const dummyPyqs = [
+        "CN_Final_Exam_2023.pdf",
+        "DSA_EndTerm_2023_Paper.pdf",
+        "OS_EndTerm_2024_Solved.pdf",
+        "DBMS_MidTerm_2023_Solved.pdf",
+      ];
+      tables.materials = matRes.value.data.filter((m: any) => !dummyPyqs.includes(m.file_name));
     }
     if (bmRes.status === "fulfilled" && bmRes.value.data && bmRes.value.data.length > 0) {
       tables.bookmarks = bmRes.value.data;

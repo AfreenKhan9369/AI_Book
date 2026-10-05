@@ -303,8 +303,11 @@ export function StudentDashboard({
         {pyqsList.length === 0 ? (
           <div className="p-8 text-center bg-white rounded-2xl border border-dashed border-slate-300">
             <FileText className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-            <p className="text-xs font-semibold text-slate-600">
-              No question papers available for this semester selection.
+            <p className="text-xs font-bold text-slate-700">
+              No PYQs are available
+            </p>
+            <p className="text-[11px] text-slate-500 mt-0.5">
+              Verified university question papers and solutions will appear here once published by faculty.
             </p>
           </div>
         ) : (

@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from "react";
-import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { Navbar } from "./components/Navbar";
 import { Sidebar } from "./components/Sidebar";
+import { ProtectedRoute } from "./components/ProtectedRoute";
+import { LandingPage } from "./pages/LandingPage";
 import { StudentDashboard } from "./pages/StudentDashboard";
 import { NotesCatalog } from "./pages/NotesCatalog";
 import { PyqCatalog } from "./pages/PyqCatalog";
@@ -17,13 +19,48 @@ import { AiStudyAssistantModal } from "./components/AiStudyAssistantModal";
 import { Material, Subject } from "./types";
 import { api } from "./services/api";
 
-function AppContent() {
-  const { isAuthenticated, isFaculty } = useAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
-
-  // Mobile sidebar state
+/**
+ * Shell for authenticated internal application routes
+ * (Student Dashboard, Notes, PYQs, AI Hub, Faculty Studio, Profile)
+ */
+function DashboardLayout({
+  children,
+  onOpenUpload,
+}: {
+  children: React.ReactNode;
+  onOpenUpload?: () => void;
+}) {
+  const { isFaculty } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  return (
+    <div className="min-h-screen bg-slate-50 text-slate-800 flex font-sans selection:bg-indigo-500 selection:text-white">
+      {/* Side Panel for Navigation */}
+      <Sidebar
+        isOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
+        onOpenUpload={isFaculty ? onOpenUpload : undefined}
+      />
+
+      {/* Main Layout Area: Top Header + Routed Page Views */}
+      <div className="flex-1 flex flex-col min-w-0 min-h-screen">
+        {/* Top Header Navbar */}
+        <Navbar
+          onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
+          onOpenUpload={isFaculty ? onOpenUpload : undefined}
+        />
+
+        {/* Main Content Container */}
+        <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          {children}
+        </main>
+      </div>
+    </div>
+  );
+}
+
+function AppContent() {
+  const { isFaculty, isAuthenticated } = useAuth();
 
   // Global modals state
   const [activePdf, setActivePdf] = useState<Material | null>(null);
@@ -50,8 +87,10 @@ function AppContent() {
   };
 
   useEffect(() => {
-    loadData();
-  }, []);
+    if (isAuthenticated) {
+      loadData();
+    }
+  }, [isAuthenticated]);
 
   // PDF Viewer handler
   const handleViewPdf = (material: Material) => {
@@ -77,82 +116,109 @@ function AppContent() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 flex font-sans selection:bg-indigo-500 selection:text-white">
-      {/* Side Panel for Navigation (Dashboard, Notes Catalog, PYQs, AI Study Hub) */}
-      <Sidebar
-        isOpen={isSidebarOpen}
-        onClose={() => setIsSidebarOpen(false)}
-        onOpenUpload={isFaculty ? () => setIsUploadOpen(true) : undefined}
-      />
+    <>
+      <Routes>
+        {/* Public First Page: Professional Modern Landing Page */}
+        <Route path="/" element={<LandingPage />} />
 
-      {/* Main Layout Area: Top Header + Routed Page Views */}
-      <div className="flex-1 flex flex-col min-w-0 min-h-screen">
-        {/* Top Header Navbar */}
-        <Navbar
-          onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
-          onOpenUpload={isFaculty ? () => setIsUploadOpen(true) : undefined}
-        />
+        {/* Public Authentication Pages */}
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
 
-        {/* Main Routed Content */}
-        <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <Routes>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route
-              path="/dashboard"
-              element={
+        {/* Protected Student Dashboard Route */}
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute requiredRole="student">
+              <DashboardLayout onOpenUpload={() => setIsUploadOpen(true)}>
                 <StudentDashboard
                   onOpenAi={handleOpenAi}
                   onViewPdf={handleViewPdf}
                   onDownloadPdf={handleDownloadPdf}
                 />
-              }
-            />
-            <Route
-              path="/notes"
-              element={
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Protected Notes Catalog Route */}
+        <Route
+          path="/notes"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout onOpenUpload={() => setIsUploadOpen(true)}>
                 <NotesCatalog
                   onViewPdf={handleViewPdf}
                   onDownloadPdf={handleDownloadPdf}
                   onOpenAi={handleOpenAi}
                 />
-              }
-            />
-            <Route
-              path="/pyqs"
-              element={
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Protected PYQs Catalog Route */}
+        <Route
+          path="/pyqs"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout onOpenUpload={() => setIsUploadOpen(true)}>
                 <PyqCatalog
                   onViewPdf={handleViewPdf}
                   onDownloadPdf={handleDownloadPdf}
                   onOpenAi={handleOpenAi}
                 />
-              }
-            />
-            <Route path="/ai-hub" element={<AiAssistantPage />} />
-            <Route
-              path="/admin"
-              element={
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Protected AI Study Hub Route */}
+        <Route
+          path="/ai-hub"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout onOpenUpload={() => setIsUploadOpen(true)}>
+                <AiAssistantPage />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Protected Faculty Administration Studio Route */}
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute requiredRole="faculty">
+              <DashboardLayout onOpenUpload={() => setIsUploadOpen(true)}>
                 <AdminDashboard
                   onViewPdf={handleViewPdf}
                   onDownloadPdf={handleDownloadPdf}
                 />
-              }
-            />
-            <Route
-              path="/profile"
-              element={
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Protected User Academic Profile Route */}
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout onOpenUpload={() => setIsUploadOpen(true)}>
                 <ProfilePage
                   onViewPdf={handleViewPdf}
                   onDownloadPdf={handleDownloadPdf}
                   onOpenAi={handleOpenAi}
                 />
-              }
-            />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
-          </Routes>
-        </main>
-      </div>
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Fallback route */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
 
       {/* Global PDF Viewer Modal */}
       {activePdf && (
@@ -187,7 +253,7 @@ function AppContent() {
         initialTab={aiModalTab}
         initialMaterial={aiModalMaterial}
       />
-    </div>
+    </>
   );
 }
 

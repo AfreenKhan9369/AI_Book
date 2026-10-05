@@ -44,7 +44,7 @@ export function Navbar({
       case "/ai-hub":
         return "AI Study Hub & Copilot";
       case "/admin":
-        return "Faculty Administration Studio";
+        return "Faculty Studio Dashboard";
       case "/profile":
         return "Academic Profile & Saved Notes";
       default:
@@ -199,7 +199,7 @@ export function Navbar({
                         onClick={() => {
                           setUserDropdownOpen(false);
                           logout();
-                          navigate("/login");
+                          navigate("/");
                         }}
                         className="w-full flex items-center gap-2.5 px-4 py-2 text-xs font-medium text-rose-600 hover:bg-rose-50"
                       >

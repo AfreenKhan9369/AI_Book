@@ -169,12 +169,6 @@ export function AiAssistantPage() {
       {/* Top Banner */}
       <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-6 sm:p-8 rounded-3xl border border-slate-800 shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
         <div>
-          <div className="flex items-center gap-2 mb-2">
-            <span className="px-3 py-1 rounded-full text-xs font-bold bg-amber-400/20 text-amber-300 border border-amber-400/30 flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              <span>Google Gemini 3.8 Flash Powered</span>
-            </span>
-          </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-white">
             AI College Study Hub
           </h1>
