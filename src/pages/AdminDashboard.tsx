@@ -14,10 +14,6 @@ import {
   ExternalLink,
   Layers,
   GraduationCap,
-  Database,
-  RefreshCw,
-  CheckCircle2,
-  Server,
 } from "lucide-react";
 import { Material, Subject, OverviewStats, User } from "../types";
 import { api } from "../services/api";
@@ -32,21 +28,12 @@ interface AdminDashboardProps {
 
 export function AdminDashboard({ onViewPdf, onDownloadPdf }: AdminDashboardProps) {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<"materials" | "subjects" | "students" | "database">("materials");
+  const [activeTab, setActiveTab] = useState<"materials" | "subjects" | "students">("materials");
 
   const [stats, setStats] = useState<OverviewStats | null>(null);
   const [materials, setMaterials] = useState<Material[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [students, setStudents] = useState<any[]>([]);
-  const [supabaseStatus, setSupabaseStatus] = useState<{
-    connected: boolean;
-    latencyMs?: number;
-    message?: string;
-    totalUsers?: number;
-    syncedUsers?: number;
-  } | null>(null);
-  const [syncingSupabase, setSyncingSupabase] = useState(false);
-  const [testingSupabase, setTestingSupabase] = useState(false);
   const [loading, setLoading] = useState(true);
 
   // Modals
@@ -71,45 +58,10 @@ export function AdminDashboard({ onViewPdf, onDownloadPdf }: AdminDashboardProps
       setMaterials(matRes);
       setSubjects(subRes);
       setStudents(studRes);
-      loadSupabaseData();
     } catch (e) {
       console.error("Failed to load admin data:", e);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const loadSupabaseData = async () => {
-    try {
-      const statusRes = await api.get<any>("/users/supabase/status");
-      setSupabaseStatus(statusRes);
-    } catch (e) {
-      console.warn("Failed to load database status:", e);
-    }
-  };
-
-  const handleTestSupabase = async () => {
-    setTestingSupabase(true);
-    try {
-      const statusRes = await api.get<any>("/users/supabase/status");
-      setSupabaseStatus(statusRes);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setTestingSupabase(false);
-    }
-  };
-
-  const handleSyncAllSupabase = async () => {
-    setSyncingSupabase(true);
-    try {
-      const res = await api.post<{ message: string }>("/users/supabase/sync-all");
-      alert(res.message);
-      await loadSupabaseData();
-    } catch (e: any) {
-      alert(e.message || "Failed to sync to Supabase");
-    } finally {
-      setSyncingSupabase(false);
     }
   };
 
@@ -284,22 +236,6 @@ export function AdminDashboard({ onViewPdf, onDownloadPdf }: AdminDashboardProps
             <Users className="w-4 h-4 text-emerald-600" />
             <span>Student Directory ({students.length})</span>
           </button>
-
-          <button
-            onClick={() => {
-              setActiveTab("database");
-              loadSupabaseData();
-            }}
-            className={`py-3.5 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 ${
-              activeTab === "database"
-                ? "border-emerald-600 text-emerald-700 bg-white"
-                : "border-transparent text-slate-500 hover:text-slate-900"
-            }`}
-          >
-            <Database className="w-4 h-4 text-emerald-600" />
-            <span>Database Status</span>
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          </button>
         </div>
 
         {/* TAB 1: MATERIALS TABLE */}
@@ -359,7 +295,6 @@ export function AdminDashboard({ onViewPdf, onDownloadPdf }: AdminDashboardProps
                   <tr>
                     <th className="py-3 px-4">Title & Unit</th>
                     <th className="py-3 px-4">Subject</th>
-                    <th className="py-3 px-4">Type</th>
                     <th className="py-3 px-4">Semester</th>
                     <th className="py-3 px-4 text-right">Actions</th>
                   </tr>
@@ -378,17 +313,6 @@ export function AdminDashboard({ onViewPdf, onDownloadPdf }: AdminDashboardProps
                       <td className="py-3.5 px-4">
                         <span className="font-semibold text-slate-800">{m.subject_name}</span>
                         <span className="text-[11px] text-indigo-600 block font-mono">{m.subject_code}</span>
-                      </td>
-                      <td className="py-3.5 px-4">
-                        <span
-                          className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase ${
-                            m.type === "pyq"
-                              ? "bg-amber-100 text-amber-800"
-                              : "bg-sky-100 text-sky-800"
-                          }`}
-                        >
-                          {m.type === "pyq" ? "PYQ" : "Note"}
-                        </span>
                       </td>
                       <td className="py-3.5 px-4">
                         <span className="font-semibold">Sem {m.semester}</span>
@@ -547,138 +471,6 @@ export function AdminDashboard({ onViewPdf, onDownloadPdf }: AdminDashboardProps
                   ))}
                 </tbody>
               </table>
-            </div>
-          </div>
-        )}
-
-        {/* TAB 4: DATABASE CONNECTION STATUS */}
-        {activeTab === "database" && (
-          <div className="p-6 space-y-6">
-            {/* Status Header Card */}
-            <div className="bg-gradient-to-br from-emerald-500/10 via-slate-50 to-indigo-500/5 p-6 rounded-2xl border border-emerald-200/80 shadow-xs">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="space-y-1.5">
-                  <div className="flex items-center gap-2">
-                    <span className="p-2.5 rounded-xl bg-emerald-600 text-white shadow-xs">
-                      <Database className="w-5 h-5" />
-                    </span>
-                    <div>
-                      <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                        <span>Database Connection Status</span>
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
-                          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                          {supabaseStatus?.connected ? "Connected & Live" : "Connected"}
-                        </span>
-                      </h2>
-                      <p className="text-xs text-slate-500">
-                        Cloud database synchronization and high-availability connection status for academic materials and user profiles.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    onClick={handleTestSupabase}
-                    disabled={testingSupabase}
-                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-slate-200 hover:border-slate-300 text-slate-700 text-xs font-semibold shadow-2xs hover:bg-slate-50 transition-all disabled:opacity-50"
-                  >
-                    <RefreshCw className={`w-3.5 h-3.5 ${testingSupabase ? "animate-spin text-emerald-600" : ""}`} />
-                    <span>{testingSupabase ? "Testing..." : "Verify Connection"}</span>
-                  </button>
-                  <button
-                    onClick={handleSyncAllSupabase}
-                    disabled={syncingSupabase}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition-all disabled:opacity-50"
-                  >
-                    <Server className="w-3.5 h-3.5" />
-                    <span>{syncingSupabase ? "Syncing..." : "Sync Database"}</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Status Metrics Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-5 pt-5 border-t border-emerald-200/60">
-                <div className="bg-white/90 p-4 rounded-xl border border-slate-200/80 shadow-2xs">
-                  <div className="flex items-center justify-between text-slate-400 mb-1">
-                    <span className="text-[10px] uppercase font-bold text-slate-500">Service Status</span>
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  </div>
-                  <span className="text-sm font-extrabold text-slate-900 block">
-                    Operational &amp; Live
-                  </span>
-                  <span className="text-[11px] text-emerald-700 font-medium mt-0.5 block">
-                    High availability active
-                  </span>
-                </div>
-
-                <div className="bg-white/90 p-4 rounded-xl border border-slate-200/80 shadow-2xs">
-                  <div className="flex items-center justify-between text-slate-400 mb-1">
-                    <span className="text-[10px] uppercase font-bold text-slate-500">Response Latency</span>
-                    <RefreshCw className="w-4 h-4 text-sky-600" />
-                  </div>
-                  <span className="text-sm font-extrabold text-slate-900 block">
-                    {supabaseStatus?.latencyMs ? `${supabaseStatus.latencyMs} ms` : "< 50 ms"}
-                  </span>
-                  <span className="text-[11px] text-sky-700 font-medium mt-0.5 block">
-                    Low latency connection
-                  </span>
-                </div>
-
-                <div className="bg-white/90 p-4 rounded-xl border border-slate-200/80 shadow-2xs">
-                  <div className="flex items-center justify-between text-slate-400 mb-1">
-                    <span className="text-[10px] uppercase font-bold text-slate-500">Data Replication</span>
-                    <Server className="w-4 h-4 text-indigo-600" />
-                  </div>
-                  <span className="text-sm font-extrabold text-slate-900 block">
-                    Real-Time Active
-                  </span>
-                  <span className="text-[11px] text-indigo-700 font-medium mt-0.5 block">
-                    Continuous sync enabled
-                  </span>
-                </div>
-
-                <div className="bg-white/90 p-4 rounded-xl border border-slate-200/80 shadow-2xs">
-                  <div className="flex items-center justify-between text-slate-400 mb-1">
-                    <span className="text-[10px] uppercase font-bold text-slate-500">Security Layer</span>
-                    <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                  </div>
-                  <span className="text-sm font-extrabold text-slate-900 block">
-                    SSL / TLS Encrypted
-                  </span>
-                  <span className="text-[11px] text-emerald-700 font-medium mt-0.5 block">
-                    Row-level security active
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Persistence & Security Summary Card */}
-            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-2xs space-y-4">
-              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-indigo-600" />
-                <span>Cloud Storage &amp; Persistence Overview</span>
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-                <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 space-y-1">
-                  <span className="font-bold text-slate-900 block">Academic Notes &amp; PYQs</span>
-                  <p className="text-slate-500 text-[11px] leading-relaxed">
-                    All published lecture handouts and past semester question papers are persistently stored and accessible to enrolled students.
-                  </p>
-                </div>
-                <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 space-y-1">
-                  <span className="font-bold text-slate-900 block">Student Directory &amp; Auth</span>
-                  <p className="text-slate-500 text-[11px] leading-relaxed">
-                    Student accounts and faculty credentials are protected with encrypted password hashing and secure token validation.
-                  </p>
-                </div>
-                <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 space-y-1">
-                  <span className="font-bold text-slate-900 block">Automated Redundancy</span>
-                  <p className="text-slate-500 text-[11px] leading-relaxed">
-                    Data is mirrored across persistent cloud storage layers to prevent data loss across server restarts.
-                  </p>
-                </div>
-              </div>
             </div>
           </div>
         )}
