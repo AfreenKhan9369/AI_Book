@@ -6,14 +6,12 @@ import {
   FileText,
   Sparkles,
   ShieldCheck,
-  Bookmark,
   User,
   LogOut,
   Upload,
   GraduationCap,
   X,
   ChevronRight,
-  ExternalLink,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
@@ -257,12 +255,12 @@ export function Sidebar({
           )}
 
           {/* Quick Academic Actions */}
-          <div>
-            <div className="px-3 mb-2 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
-              {isFaculty ? "Faculty Publishing" : "Quick Study Tools"}
-            </div>
-            <div className="space-y-1.5">
-              {isFaculty && onOpenUpload && (
+          {isFaculty && onOpenUpload && (
+            <div>
+              <div className="px-3 mb-2 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+                Faculty Publishing
+              </div>
+              <div className="space-y-1.5">
                 <button
                   onClick={() => {
                     handleLinkClick();
@@ -276,24 +274,9 @@ export function Sidebar({
                   </div>
                   <span className="text-[10px] font-bold text-indigo-200">+</span>
                 </button>
-              )}
-
-              {!isFaculty && (
-                <Link
-                  to="/profile"
-                  onClick={handleLinkClick}
-                  className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-colors ${
-                    location.pathname === "/profile"
-                      ? "bg-slate-100 text-slate-900 font-bold"
-                      : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-                  }`}
-                >
-                  <Bookmark className="w-4 h-4 text-rose-500" />
-                  <span>Saved Revision Notes</span>
-                </Link>
-              )}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* User Footer / Sign Out */}

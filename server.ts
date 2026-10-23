@@ -6,30 +6,41 @@ import { app, ensureDatabase } from "./server/app.js";
 
 dotenv.config();
 
-const PORT = 3000;
+const PORT = Number(process.env.PORT) || 3000;
 
 async function startServer() {
-  // Initialize DB and Seed Data
-  await ensureDatabase();
+  try {
+    // Vite middleware in dev or static files in production
+    if (process.env.NODE_ENV !== "production") {
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: "spa",
+      });
+      app.use(vite.middlewares);
+    } else {
+      const distPath = path.join(process.cwd(), "dist");
+      app.use(express.static(distPath));
+      app.get("*", (_req, res) => {
+        res.sendFile(path.join(distPath, "index.html"));
+      });
+    }
 
-  // Vite middleware in dev or static files in production
-  if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
+    const server = app.listen(PORT, "0.0.0.0", () => {
+      console.log(`[AI_Book] Server running at http://0.0.0.0:${PORT}`);
     });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
-    app.get("*", (_req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
+
+    server.on("error", (err: any) => {
+      console.error("[AI_Book] Server error:", err);
     });
+
+    // Initialize DB and Seed Data (runs in background so server responds immediately)
+    ensureDatabase().catch((err) => {
+      console.error("[AI_Book] Database initialization error:", err);
+    });
+  } catch (err) {
+    console.error("[AI_Book] Failed to start server:", err);
+    process.exit(1);
   }
-
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`[AI_Book] Server running at http://0.0.0.0:${PORT}`);
-  });
 }
 
 startServer();
