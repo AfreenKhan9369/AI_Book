@@ -5,7 +5,6 @@ import {
   LogIn,
   AlertCircle,
   Loader2,
-  User,
   ShieldCheck,
   ArrowLeft,
   CheckCircle2,
@@ -25,26 +24,15 @@ export function LoginPage() {
     roleParam === "faculty" ? "faculty" : "student"
   );
 
-  const [email, setEmail] = useState(
-    roleParam === "faculty" ? "faculty@college.edu" : "student@college.edu"
-  );
-  const [password, setPassword] = useState(
-    roleParam === "faculty" ? "faculty123" : "student123"
-  );
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // Update credentials when switching role tab
+  // Update active role tab
   const handleRoleTabChange = (newRole: "student" | "faculty") => {
     setActiveRoleTab(newRole);
     setError(null);
-    if (newRole === "faculty") {
-      setEmail("faculty@college.edu");
-      setPassword("faculty123");
-    } else {
-      setEmail("student@college.edu");
-      setPassword("student123");
-    }
   };
 
   // Synchronize role tab if query param changes
@@ -80,20 +68,6 @@ export function LoginPage() {
       }
     } catch (err: any) {
       setError(err.message || "Invalid credentials. Please verify your college email and password.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleQuickDemo = async (demoEmail: string, demoPass: string, defaultPath: string) => {
-    setError(null);
-    setLoading(true);
-    try {
-      await login(demoEmail, demoPass);
-      const target = redirectParam || defaultPath;
-      navigate(target);
-    } catch (err: any) {
-      setError(err.message || "Demo login failed.");
     } finally {
       setLoading(false);
     }
@@ -166,64 +140,6 @@ export function LoginPage() {
               <span>{error}</span>
             </div>
           )}
-
-          {/* Quick 1-Click Verified Demo Access */}
-          <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80">
-            <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block mb-2">
-              Verified 1-Click Institutional Access
-            </span>
-
-            {activeRoleTab === "student" ? (
-              <button
-                type="button"
-                onClick={() => handleQuickDemo("student@college.edu", "student123", "/dashboard")}
-                className="w-full p-2.5 rounded-xl bg-white hover:bg-indigo-50 border border-slate-200 hover:border-indigo-300 text-left transition-all text-xs font-bold text-slate-800 flex items-center justify-between shadow-2xs group"
-              >
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center flex-shrink-0 group-hover:bg-indigo-100">
-                    <User className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <p className="leading-tight">Aarav Patel (Student)</p>
-                    <p className="text-[10px] font-normal text-slate-500 leading-tight">
-                      Semester 4 • B.Tech Computer Science
-                    </p>
-                  </div>
-                </div>
-                <span className="text-[11px] font-bold text-indigo-600">Enter →</span>
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => handleQuickDemo("faculty@college.edu", "faculty123", "/admin")}
-                className="w-full p-2.5 rounded-xl bg-white hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300 text-left transition-all text-xs font-bold text-slate-800 flex items-center justify-between shadow-2xs group"
-              >
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center flex-shrink-0 group-hover:bg-emerald-100">
-                    <ShieldCheck className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <p className="leading-tight">Prof. Rajesh Sharma (Faculty)</p>
-                    <p className="text-[10px] font-normal text-slate-500 leading-tight">
-                      Associate Professor • CSE Dept Administration
-                    </p>
-                  </div>
-                </div>
-                <span className="text-[11px] font-bold text-emerald-700">Enter →</span>
-              </button>
-            )}
-          </div>
-
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-slate-200" />
-            </div>
-            <div className="relative flex justify-center text-xs">
-              <span className="bg-white px-2 text-slate-400 font-medium">
-                Or sign in with custom credentials
-              </span>
-            </div>
-          </div>
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
